@@ -1,4 +1,11 @@
-from app.models import Capability, Control, Tactic, TacticDefaultMapping, Technique, TechniqueCapabilityMapping
+from app.models import (
+    Capability,
+    Control,
+    Tactic,
+    TacticDefaultMapping,
+    Technique,
+    TechniqueCapabilityMapping,
+)
 from scripts.seed import run as run_seed
 from scripts.seed_data import ALL_CAPABILITIES, KB, TACTIC_DEFAULTS, TACTIC_GROUPS
 

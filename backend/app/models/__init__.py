@@ -1,5 +1,7 @@
 from app.models.capability import Capability
 from app.models.control import Control
+from app.models.engagement import Engagement
+from app.models.finding import Finding
 from app.models.mapping import (
     TechniqueCapabilityMapping,
     TechniqueCapabilityMappingCapability,
@@ -14,14 +16,16 @@ from app.models.tactic_default import (
 from app.models.technique import Technique
 
 __all__ = [
-    "Tactic",
-    "Technique",
     "Capability",
     "Control",
-    "TechniqueCapabilityMapping",
-    "TechniqueCapabilityMappingCapability",
-    "TechniqueCapabilityMappingControl",
+    "Engagement",
+    "Finding",
+    "Tactic",
     "TacticDefaultMapping",
     "TacticDefaultMappingCapability",
     "TacticDefaultMappingControl",
+    "Technique",
+    "TechniqueCapabilityMapping",
+    "TechniqueCapabilityMappingCapability",
+    "TechniqueCapabilityMappingControl",
 ]

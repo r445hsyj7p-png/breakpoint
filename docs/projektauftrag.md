@@ -458,11 +458,17 @@ Unbekannte Codes sind **kein Fehlerfall** (kein 4xx) — sie erscheinen in `unkn
 
 ### 10a.7 Definition of Done für Schritt 2
 
-- [ ] Migration für `engagement`/`finding` läuft durch
-- [ ] `POST /api/analyze` liefert für die Prototyp-Beispielkette ein `AnalyzerResult` mit plausibler Priorisierung
-- [ ] Sub-Technique-Fallback nachweislich korrekt (nicht die Prototyp-Präfix-Heuristik)
-- [ ] Unbekannte Codes landen sichtbar in `unknown_codes`, nie stillschweigend verworfen
-- [ ] Alle Tests aus 10a.6 grün
+- [x] Migration für `engagement`/`finding` läuft durch
+- [x] `POST /api/analyze` liefert für die Prototyp-Beispielkette ein `AnalyzerResult` mit plausibler Priorisierung
+- [x] Sub-Technique-Fallback nachweislich korrekt (nicht die Prototyp-Präfix-Heuristik)
+- [x] Unbekannte Codes landen sichtbar in `unknown_codes`, nie stillschweigend verworfen
+- [x] Alle Tests aus 10a.6 grün (25 Tests gesamt inkl. Schritt 1)
+
+**Ergebnis der kritischen Review-Runde nach Implementierung** *(neu, v3)*: Zwei echte Bugs gefunden und behoben, bevor sie in Betrieb gegangen wären:
+- **Priorisierung war nicht deterministisch**: Bei exakt gleicher Kettenabdeckung/Impact/Effort entschied die zufällige Eingabereihenfolge der Techniken über die Rangfolge. Fix: `control_id` als viertes, stabiles Tie-Break-Kriterium ergänzt (Abschnitt 10a.4) — dieselbe Technik-Menge liefert jetzt unabhängig von der Eingabereihenfolge dieselbe Priorisierung.
+- **`GET /api/engagements/{id}/analysis` hatte kein `ORDER BY`**: `SELECT DISTINCT` ohne Sortierung liefert in Postgres keine garantierte, stabile Reihenfolge. Fix: `ORDER BY technique_id` ergänzt.
+
+Geprüft und bewusst **nicht** geändert: kein Unique-Constraint auf `finding(engagement_id, technique_id)` — hätte das für Version 1 explizit vorgesehene `raw_source_ref`-Feld (mehrere Fundstellen derselben Technik im selben Report, Abschnitt 5/9) unnötig für die spätere automatische Report-Extraktion eingeschränkt. Die Analyse dedupliziert bereits zuverlässig auf Lesepfad-Ebene.
 
 ---
 
