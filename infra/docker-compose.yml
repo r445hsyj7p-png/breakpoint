@@ -1,0 +1,55 @@
+name: breakpoint
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-breakpoint}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-breakpoint}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      # Nur an localhost binden — hochsensible Daten, kein Netzwerkzugriff von
+      # außen, auch nicht in der Entwicklungsumgebung (docs/projektauftrag.md
+      # Abschnitt 8/10.4).
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-breakpoint}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://breakpoint:change-me@db:5432/breakpoint}
+    volumes:
+      - ../backend/app:/app/app
+      - ../backend/scripts:/app/scripts
+      - ../backend/alembic:/app/alembic
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+    restart: unless-stopped
+    volumes:
+      - ../frontend/src:/app/src
+      - ../frontend/index.html:/app/index.html
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

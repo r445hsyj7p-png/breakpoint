@@ -1,0 +1,17 @@
+# Umgebungsdateien mit echten Zugangsdaten
+.env
+
+# Backend (Python)
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/*.egg-info/
+*.pyc
+
+# Frontend (Node)
+frontend/node_modules/
+frontend/dist/
+
+# Editor/OS
+.DS_Store

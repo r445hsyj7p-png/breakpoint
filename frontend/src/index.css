@@ -1,0 +1,49 @@
+@import 'tailwindcss';
+
+/* Selbst gehostete Fonts statt Google-Fonts-CDN (docs/projektauftrag.md Abschnitt 8) */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/600.css';
+@import '@fontsource/space-grotesk/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/600.css';
+
+/* Farbsystem 1:1 aus dem HTML-Prototyp übernommen (breakpoint-dashboard.html) */
+@theme {
+  --color-graphite-950: #0a0d13;
+  --color-graphite-900: #10141c;
+  --color-graphite-850: #151b25;
+  --color-graphite-800: #1b212d;
+  --color-line: #242c3b;
+  --color-line-soft: #1d2431;
+  --color-ink-100: #e8eaf0;
+  --color-ink-300: #b7becb;
+  --color-ink-400: #8891a3;
+  --color-ink-600: #5b6373;
+
+  --color-amber: #e8a33d;
+  --color-amber-dim: #4a3a1e;
+  --color-ember: #e8593f;
+  --color-ember-dim: #4a2620;
+  --color-detect: #5b8fef;
+  --color-detect-dim: #1f2b45;
+  --color-respond: #9b7fe8;
+  --color-respond-dim: #2a2440;
+  --color-prevent: #4faf77;
+  --color-prevent-dim: #1c3327;
+  --color-portfolio: #3fc7c2;
+  --color-portfolio-dim: #173b39;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+body {
+  background-color: var(--color-graphite-950);
+  color: var(--color-ink-100);
+  font-family: var(--font-sans);
+}
