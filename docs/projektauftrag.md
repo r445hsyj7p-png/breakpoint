@@ -1,6 +1,6 @@
 # Projektauftrag für Claude Code: Breakpoint — ATT&CK-to-Action Plattform
 
-> **v2 — überarbeitet nach Review-Session vom 29.08.2026.** Änderungen gegenüber der ursprünglichen Fassung sind in den betroffenen Abschnitten markiert (▶ **Update v2**). Grundlage der Überarbeitung: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe neuer Abschnitt 2a).
+> **v3 — ergänzt bei Schritt-2-Planung vom 29.08.2026.** Änderungen sind mit ▶ **Update v3** markiert: eine gezielte, enge Ausnahme von der Offline-Regel für den MITRE-Import (Abschnitt 2, 6a.2, 9). Frühere Änderungen (▶ **Update v2**) stammen aus der Review-Session vom 29.08.2026: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe Abschnitt 2a).
 
 Dieses Dokument ist der vollständige Übergabe-Auftrag, um das bisher als HTML-Mockup validierte Konzept **Breakpoint** ("From Attack Technique to Action") als produktive, im eigenen Datacenter betriebene Anwendung mit Claude Code umzusetzen. Es enthält Kontext, Architekturentscheidungen, Datenmodell, Modulübersicht und einen konkret ausführbaren **Schritt 1**.
 
@@ -23,13 +23,13 @@ Der interaktive HTML-Prototyp liegt jetzt vollständig vor (`breakpoint-dashboar
 
 | Anforderung | Konsequenz für die Architektur |
 |---|---|
-| **Nur On-Prem / eigenes Datacenter** | Keine Cloud-Dienste (kein AWS/Azure/GCP-SaaS, keine externen APIs zur Laufzeit). Alles muss in eigenen Containern/VMs laufen. |
+| **Nur On-Prem / eigenes Datacenter** | Keine Cloud-Dienste (kein AWS/Azure/GCP-SaaS, keine externen APIs zur Laufzeit). Alles muss in eigenen Containern/VMs laufen. ▶ **Eine einzige, eng begrenzte Ausnahme** *(neu, v3)*: admin-getriggerte, ausgehende Abfragen der offiziellen MITRE-ATT&CK-Quellen (GitHub-Releases `mitre-attack/attack-stix-data` bzw. der öffentliche TAXII-2.1-Server `attack-taxii.mitre.org`) für den Techniken-Import, siehe Abschnitt 6a.2. Alle anderen Grundsätze (kein Datenabfluss, keine sonstigen externen APIs, kein automatischer/unbeaufsichtigter Sync) bleiben unverändert bestehen. |
 | **Interne LLM-Plattform bereits vorhanden** | Kein eigenes Modell-Hosting aufbauen — die Anwendung integriert sich als Client gegen die bestehende Plattform (vermutlich OpenAI-kompatible oder proprietäre API; siehe offene Fragen in Abschnitt 12). |
 | **PydanticAI bereits im Haus verfügbar** | Wird als Abstraktionsschicht für alle LLM-Aufrufe genutzt — nicht als rohe Prompt-Strings, sondern mit typisierten Input-/Output-Schemas. |
 | **Hochsensible Daten** | Red-Team-Findings zeigen konkrete Kundenschwachstellen. Kein Datenabfluss nach außen, auch nicht indirekt (z. B. Telemetrie, Fehler-Tracking-SaaS, Font-CDNs im Frontend). |
 | **Zwei sehr unterschiedliche Nutzergruppen** | Technische Analysten (Detailtiefe, T-Nummern, Capabilities) und Sales (Geschäftssprache, keine ATT&CK-Kenntnis vorausgesetzt) — UI und ggf. Rollenrechte müssen das abbilden, **aus derselben berechneten Wahrheit heraus** (siehe 2a). |
 | **Portfolio ändert sich regelmäßig selbst** | Technologien/Leistungen und deren Capability-Zuordnungen dürfen nicht hart codiert sein — es braucht einen **Admin-Bereich**, über den das Team das Portfolio ohne Code-Änderung/Deployment pflegt (siehe Abschnitt 6a). |
-| **MITRE ATT&CK entwickelt sich weiter** | Da kein Live-Internetzugriff zur Laufzeit erlaubt ist, braucht es einen **admin-gesteuerten Import-Workflow**, um neue/geänderte Techniken periodisch manuell nachzuladen (siehe Abschnitt 6a). |
+| **MITRE ATT&CK entwickelt sich weiter** | ▶ *(v3)* MITRE veröffentlicht ca. zweimal jährlich (Frühjahr `X.0`, Herbst `X.1`) neue STIX-Daten. Der **admin-gesteuerte Import-Workflow** (Abschnitt 6a) holt das Bundle jetzt direkt per Admin-Klick von der offiziellen Quelle (s. o.), statt dass ein Admin es manuell auf einem separaten internetfähigen Rechner herunterladen und hochladen muss. Review/Diff/Freigabe bleiben unverändert manuell — kein automatischer, unbeaufsichtigter Sync. |
 | ▶ **Portfolio-Fit darf Priorisierung nie beeinflussen** *(neu, v2)* | `priority_rank` wird ausschließlich aus Impact/Effort/Kettenwirkung der Sicherheitslücke berechnet. Ob eine Maßnahme durch eigenes Portfolio abgedeckt ist, ist reine Zusatzinformation und fließt **nie** in die Sortierung ein — sonst wird aus einer neutralen Sicherheitsempfehlung verdeckter Produktverkauf. |
 | ▶ **Lücken sind nie ausblendbar** *(neu, v2)* | Ungedeckte Capabilities/Portfolio-Gaps müssen in Analyst- und Sales-Ansicht immer sichtbar sein. Kein Toggle, keine selektive Auslassung im Sales-Briefing. |
 
@@ -214,11 +214,11 @@ Beide Funktionen sind **kein "nice to have"**, sondern Grundvoraussetzung, damit
 - Änderungshistorie pro Technologie (wer hat wann was geändert) — wichtig, da sich das direkt auf laufende Kundenempfehlungen auswirkt
 - Zugriff ausschließlich für die Rolle `admin` (ggf. später eine feinere Rolle `portfolio_admin`, falls Sales-Leitung das pflegen soll, ohne volle System-Admin-Rechte zu haben)
 
-### 6a.2 MITRE-Techniken-Import (admin-gesteuert, kein Live-Sync)
+### 6a.2 MITRE-Techniken-Import (admin-gesteuert, kein automatischer Sync)
 
-Da laut Abschnitt 8 keine Laufzeit-Internetverbindung erlaubt ist, läuft der Import **nicht automatisch**, sondern als bewusst angestoßener Admin-Workflow:
+▶ *(v3)* Der Import läuft weiterhin **nicht automatisch/unbeaufsichtigt**, sondern als bewusst angestoßener Admin-Workflow — aber mit einer eng begrenzten Ausnahme von der sonstigen Offline-Regel (Abschnitt 2): das Bundle darf direkt von der offiziellen MITRE-Quelle geholt werden, statt den Umweg über einen separaten internetfähigen Rechner zu gehen.
 
-1. **Bereitstellung der Quelldaten**: Ein Admin lädt das aktuelle MITRE-ATT&CK-STIX-Bundle extern herunter (z. B. von einem Rechner mit Internetzugang) und lädt die Datei im Admin-Bereich hoch — kein direkter Zugriff der Anwendung auf `attack.mitre.org` zur Laufzeit.
+1. **Bereitstellung der Quelldaten**: Ein Admin klickt im Admin-Bereich auf "Neue ATT&CK-Version prüfen/laden". Das Backend fragt **ausschließlich** die offizielle MITRE-Quelle ab — entweder die GitHub-Releases von `mitre-attack/attack-stix-data` oder den öffentlichen TAXII-2.1-Server (`attack-taxii.mitre.org/api/v21/`) — und lädt das aktuelle STIX-Bundle herunter. Alternativ kann ein Admin weiterhin eine Datei manuell hochladen (z. B. wenn der Server keinen Internetzugriff hat oder als Fallback). Kein Zugriff auf irgendeine andere externe Quelle oder zu einem anderen Zweck als diesem Import.
 2. **Parsen & Diff-Ansicht**: Das Backend parst das Bundle und zeigt **vor** jeder Übernahme eine Diff-Ansicht: neue Techniken, geänderte Namen/Taktik-Zuordnungen, als "deprecated" markierte Techniken. Sub-Technique-Beziehungen werden aus der STIX-Relationship übernommen (nicht aus der ID geparst, s. Abschnitt 5). Kein automatisches Überschreiben bestehender Daten ohne Review.
 3. **Selektive Übernahme**: Admin bestätigt die Übernahme (ganz oder teilweise) — insbesondere wichtig, weil spezifische, händisch ausgearbeitete Mappings (`mapping_source = 'specific'`) durch einen Import **nicht versehentlich überschrieben** werden dürfen. Konflikte müssen explizit angezeigt werden.
 4. **Versionierung & Rollback**: Jeder Import wird als `technique_import_batch` protokolliert (Quelldatei-Version/Hash, Zeitpunkt, durchführender Admin, Anzahl geänderter/neuer Techniken). Ein Rollback auf den Stand vor dem letzten Import muss möglich sein.
@@ -277,7 +277,7 @@ result = await sales_agent.run(
 
 ## 8. Sicherheits- und Betriebsanforderungen
 
-- **Keine Laufzeit-Internetverbindung erforderlich.** Die MITRE-ATT&CK-Referenzdaten (STIX-Bundle) werden **offline heruntergeladen und periodisch manuell/über einen internen Job importiert**, nicht live von `attack.mitre.org` zur Laufzeit gezogen.
+- **Keine Laufzeit-Internetverbindung für Kundendaten.** Red-Team-Findings, Engagements, Sales-Briefings etc. verlassen das Datacenter nie. ▶ *(v3)* Einzige Ausnahme: admin-getriggerte, ausgehende Abfragen der offiziellen MITRE-Quellen (GitHub-Releases/TAXII, s. Abschnitt 6a.2) für den Techniken-Import — nur lesend, nur diese zwei Hosts, nur wenn ein Admin den Import aktiv anstößt (kein Hintergrund-Job, kein automatischer Poll). Diese Ausnahme muss auf Netzwerkebene (Egress-Firewall/Proxy-Allowlist) auch technisch so eng begrenzt durchgesetzt werden, nicht nur durch Anwendungslogik.
 - Alle Frontend-Assets (Fonts, Icon-Bibliotheken) müssen **selbst gehostet** werden, keine externen CDN-Aufrufe (im Prototyp wurden Google Fonts per CDN geladen — für die produktive Version durch lokal ausgelieferte Font-Dateien ersetzen).
 - Rollenmodell mindestens: `analyst` (voller Zugriff, Techniken-Detailtiefe), `sales` (nur Sales-Briefing-Ansicht, keine T-Nummern-Rohdaten — technisch durchgesetzt über RBAC **und** den Post-Processing-Guard aus Abschnitt 7), `admin` (Portfolio-Verwaltung, MITRE-Techniken-Import, Nutzerverwaltung — siehe Abschnitt 6a).
 - Audit-Log: Wer hat wann welches Engagement analysiert / welches Sales-Briefing generiert (Tabelle `audit_log`, siehe Abschnitt 5).
@@ -292,7 +292,7 @@ Damit Schritt 1 nicht ausufert, explizit **nicht** Teil der ersten Ausbaustufe:
 - Automatische Extraktion von T-Nummern aus hochgeladenen Red-Team-Reports (PDF/DOCX) — Version 1 arbeitet mit manueller T-Nummern-Eingabe/CSV
 - Graph-Datenbank (PostgreSQL reicht vorerst)
 - Multi-Tenant-Fähigkeit (zunächst interne Nutzung / ein Mandant)
-- **Automatischer** STIX/TAXII-Live-Sync gegen `attack.mitre.org` zur Laufzeit (ausgeschlossen wegen fehlender Internetverbindung). Der **manuelle, admin-gesteuerte** Import (Abschnitt 6a.2) ist dagegen fester Bestandteil von Version 1, kein späterer Ausbau.
+- **Automatischer, unbeaufsichtigter** STIX/TAXII-Sync (Hintergrund-Job, der ohne Admin-Aktion neue Versionen zieht und/oder übernimmt) — ▶ *(v3)* ausgeschlossen, weil er den Review-vor-Übernahme-Schritt aushebeln würde, nicht mehr wegen fehlender Internetverbindung. Der **admin-getriggerte** Import gegen die offizielle MITRE-Quelle (Abschnitt 6a.2) ist dagegen fester Bestandteil von Version 1, kein späterer Ausbau.
 
 > Zur Klarstellung: Die Punkte in Abschnitt 2a ("Was die App bewusst nicht ist") sind **keine** späteren Ausbaustufen wie die Liste oben, sondern dauerhafte Produktidentität — sie sollen auch nach Version 5 nicht Realität werden, außer als bewusster, explizit abgewogener Kurswechsel.
 
@@ -364,10 +364,112 @@ breakpoint/
 
 ---
 
-## 11. Ausblick Schritt 2+ (grob, nicht Teil des aktuellen Auftrags)
+## 10a. Schritt 2 — konkreter Arbeitsauftrag *(neu, v3)*
 
-- **Schritt 2:** Analyzer-Mapping-Engine im Backend (Portierung von `KB`, `TACTIC_DEFAULTS`, korrigierter Sub-Technique-Fallback-Logik aus Abschnitt 5), **ein** kanonisches Analyzer-Output-Schema, Prioritätsalgorithmus inkl. Kettenabdeckung (nicht nur Impact/Effort der Einzeltechnik, s. Abschnitt 2a), REST-Endpunkte für Analyse-Anfragen
-- **Schritt 3:** Frontend-Tabs an echte Backend-Endpunkte anbinden (Analyzer, Techniken-Katalog)
+**Ziel von Schritt 2:** Aus dem Schritt-1-Grundgerüst wird eine echte, deterministische Analyzer-Engine — Technik-Codes rein, priorisierte Maßnahmen raus. Noch **ohne** Frontend-Anbindung (Schritt 3), Portfolio-Fit (Schritt 4) oder LLM (Schritt 5). Portfolio-Fit ist im Ergebnis-Schema bereits als Feld vorgesehen, aber bis Schritt 4 immer leer — damit sich die Schnittstelle später nicht ändert.
+
+**Lückenschluss gegenüber der bisherigen Grob-Planung:** In Abschnitt 11 (alt) war nirgends festgelegt, wer `engagement`/`finding` anlegt — Schritt 3 kümmert sich laut Abschnitt 11 nur um Analyzer- und Techniken-Katalog-Tab, nicht um den Engagements-Tab. Ohne eine persistierte Engagement/Finding-Ebene ist die Analyzer-Engine aber nur ein zustandsloser Rechner ohne Anbindung an "wer hat wann welches Engagement analysiert" (Audit-Log-Pflicht, Abschnitt 8). Deshalb wird die Engagement/Finding-Persistenz jetzt explizit **Teil von Schritt 2**, nicht länger implizit vorausgesetzt.
+
+### 10a.1 Datenmodell-Ergänzung
+
+Neue Alembic-Migration auf Basis der Schritt-1-Migration:
+
+```
+engagement
+  id (PK), name, external_ref (nullable), created_at, status
+
+finding
+  id (PK), engagement_id (FK), technique_id (FK), raw_source_ref (nullable)
+```
+
+▶ **Bewusst nicht gebaut:** die `recommendation`-Tabelle aus Abschnitt 5. Die in Abschnitt 5 offen gelassene Entscheidung ("materialisiert oder zur Laufzeit berechnet") wird hiermit getroffen: **zur Laufzeit berechnet**, nicht materialisiert. Begründung: YAGNI — Materialisierung ist eine Performance-Optimierung, für die es noch keinen Bedarfsnachweis gibt, und sie würde eine Cache-Invalidierungslogik erfordern (was passiert bei einem nachträglichen MITRE-Import oder einer Mapping-Änderung mit bereits gespeicherten Empfehlungen?), die Schritt 2 unnötig verkompliziert. Diese Entscheidung kann revidiert werden, sobald echte Performance-Daten das nahelegen.
+
+### 10a.2 Kanonisches Analyzer-Output-Schema (`app/schemas/analyzer.py`)
+
+Das in Abschnitt 2a geforderte **eine** Schema, das später unverändert sowohl die Analyst-UI rendert als auch an den PydanticAI-Sales-Agent (Schritt 5) geht:
+
+```python
+class TechniqueResult(BaseModel):
+    technique_id: str
+    technique_name: str
+    tactic_name: str
+    mapping_source: Literal["specific", "tactic_default"]
+    resolved_via_technique_id: str | None  # None bei tactic_default; sonst die
+        # Technik, deren Mapping tatsächlich griff — bei direktem Treffer sie
+        # selbst, bei Sub-Technique-Fallback ihre Basistechnik. Macht die
+        # Herkunft einer Empfehlung vollständig nachvollziehbar (Transparenz-
+        # Prinzip, s. Abschnitt 5), ohne die mapping_source-ENUM aufzublähen.
+    impact: Literal["niedrig", "mittel", "hoch", "sehr_hoch"]
+    effort: Literal["niedrig", "mittel", "hoch"]
+    capabilities: list[str]
+    controls: list[ControlRef]  # {category, label}
+    portfolio_fit: list[str] = []  # Platzhalter bis Schritt 4
+
+class PrioritizedMeasure(BaseModel):
+    control_id: int
+    category: Literal["prevent", "detect", "respond"]
+    label: str
+    priority_rank: int
+    chain_coverage_count: int  # Anzahl unterschiedlicher analysierter Techniken,
+        # die diese Maßnahme referenzieren
+    affected_technique_ids: list[str]
+
+class AnalyzerResult(BaseModel):
+    input_codes: list[str]
+    techniques: list[TechniqueResult]
+    unknown_codes: list[str]  # Codes, die auch im Katalog nicht existieren —
+        # sichtbar, nie stillschweigend verworfen (Prinzip "keine Sackgassen")
+    prioritized_measures: list[PrioritizedMeasure]
+```
+
+### 10a.3 Mapping-Resolution (`app/services/analyzer.py`)
+
+Implementiert die in Abschnitt 5 **korrigierte** Fallback-Kette (nicht die Prototyp-Heuristik):
+
+1. Exakter Treffer in `technique_capability_mapping` → `mapping_source="specific"`, `resolved_via_technique_id` = die Technik selbst.
+2. Sonst: `parent_technique_id`-Traversal — hat die Basistechnik ein spezifisches Mapping? → `mapping_source="specific"`, `resolved_via_technique_id` = Basistechnik-ID.
+3. Sonst: `tactic_default_mapping` der Taktik der Technik → `mapping_source="tactic_default"`, `resolved_via_technique_id=None`.
+4. Sonst (Technik-Code auch nicht im Katalog): landet in `unknown_codes`.
+
+### 10a.4 Prioritätsalgorithmus (v1, bewusst einfach)
+
+Löst die in Abschnitt 12 (Frage 9) offene Gewichtungsfrage für Schritt 2 pragmatisch: Aggregation pro **eindeutigem Control** über alle analysierten Techniken hinweg (via die Join-Tabellen), dann Sortierung nach:
+
+1. `chain_coverage_count` absteigend (Maßnahme, die mehr der eingegebenen Techniken adressiert, gewinnt)
+2. bei Gleichstand: höchster `impact` unter den abgedeckten Techniken, absteigend
+3. bei Gleichstand: niedrigster `effort`, aufsteigend
+
+Bewusst **kein** Gewichten nach Kettenposition (z. B. "früher Breakpoint zählt mehr") — das bleibt ein möglicher v2-Ausbau des Algorithmus, sobald echte Nutzung zeigt, ob das gebraucht wird. `priority_rank` bleibt, wie in Abschnitt 2 festgeschrieben, unabhängig von Portfolio-Fit.
+
+### 10a.5 Endpunkte (`app/api/`)
+
+- `POST /api/analyze` — zustandslos: Liste roher Technik-Code-Strings im Body (Freitext/CSV-Parsing serverseitig: Split auf Whitespace/Komma/Semikolon, Uppercase, Dedup — analog `parseCodes()` im Prototyp) → `AnalyzerResult`. Deckt den Analyzer-Tab ab, der im Prototyp ohne Engagement-Bindung funktioniert.
+- `POST /api/engagements` — Engagement anlegen (`name`, optional `external_ref`)
+- `POST /api/engagements/{id}/findings` — Technik-Codes zu einem Engagement hinzufügen (gleiches Parsing wie oben)
+- `GET /api/engagements/{id}/analysis` — berechnet `AnalyzerResult` zur Laufzeit aus den `finding`-Zeilen des Engagements (kein Caching, s. 10a.1)
+
+Unbekannte Codes sind **kein Fehlerfall** (kein 4xx) — sie erscheinen in `unknown_codes`. Leere Eingabe liefert ein leeres `AnalyzerResult` (200), keinen Fehler.
+
+### 10a.6 Tests
+
+- Mapping-Resolution: alle drei Fallback-Stufen + unbekannter Code, inkl. Regressionstest für den in Abschnitt 5 dokumentierten Prototyp-Bug (ein Sub-Technique-Code ohne eigenes Mapping darf **nicht** das Mapping eines unverwandten Geschwister-Codes erben)
+- Prioritätsalgorithmus: Dedup/Aggregation, wenn zwei Techniken denselben Control referenzieren
+- Integrationstest: `POST /api/analyze` mit der Beispielkette aus dem Prototyp (`T1566.001, T1078, T1021.001, T1059.001`)
+
+### 10a.7 Definition of Done für Schritt 2
+
+- [ ] Migration für `engagement`/`finding` läuft durch
+- [ ] `POST /api/analyze` liefert für die Prototyp-Beispielkette ein `AnalyzerResult` mit plausibler Priorisierung
+- [ ] Sub-Technique-Fallback nachweislich korrekt (nicht die Prototyp-Präfix-Heuristik)
+- [ ] Unbekannte Codes landen sichtbar in `unknown_codes`, nie stillschweigend verworfen
+- [ ] Alle Tests aus 10a.6 grün
+
+---
+
+## 11. Ausblick Schritt 3+ (grob, nicht Teil des aktuellen Auftrags)
+
+- **Schritt 2:** ✅ siehe Abschnitt 10a (konkretisiert)
+- **Schritt 3:** Frontend-Tabs an echte Backend-Endpunkte anbinden (Analyzer, Engagements, Techniken-Katalog)
 - **Schritt 4:** Portfolio-Modul inkl. Coverage-Matrix, Gap-Analyse, **Admin-Bereich mit Self-Service-CRUD** (Abschnitt 6a.1)
 - **Schritt 5:** PydanticAI-Sales-Briefing-Modul gegen interne LLM-Plattform (siehe Abschnitt 7), inkl. Post-Processing-Guard und asynchroner Verarbeitung
 - **Schritt 6:** **Admin-Bereich MITRE-Techniken-Import** mit Upload, Diff-Ansicht, Versionierung/Rollback (Abschnitt 6a.2), STIX-Relationship-basierte Sub-Technique-Zuordnung
@@ -382,7 +484,7 @@ breakpoint/
 3. Welcher Auth-Provider ist im Datacenter Standard (Keycloak, Azure AD/Entra on-prem, LDAP, etwas anderes)?
 4. Soll PostgreSQL als eigener Container mitgeliefert werden oder existiert bereits eine zentrale DB-Instanz, an die sich die Anwendung anbinden soll?
 5. Gibt es bereits ein internes Basis-Image / einen Style-Guide für Docker-Images, den Claude Code verwenden soll, statt öffentliche Docker-Hub-Images direkt zu referenzieren?
-6. In welchem Rhythmus soll das MITRE-Techniken-Update typischerweise erfolgen (z. B. quartalsweise bei größeren ATT&CK-Releases), und reicht ein einzelner Admin zur Freigabe, oder braucht es ein Vier-Augen-Prinzip, bevor ein Import produktiv übernommen wird?
+6. ▶ *(v3, teilweise beantwortet)* MITRE selbst veröffentlicht ca. zweimal jährlich (Frühjahr/Herbst) — ein quartalsweiser "Prüfen"-Klick durch einen Admin deckt das komfortabel ab. Weiterhin offen: reicht ein einzelner Admin zur Freigabe, oder braucht es ein Vier-Augen-Prinzip, bevor ein Import produktiv übernommen wird?
 7. ▶ *(neu, v2)* Welches selbst gehostete Logging-/Monitoring-Setup soll genutzt werden (z. B. Loki/Grafana), da externe SaaS-Fehler-Tracking-Dienste laut Abschnitt 2 ausgeschlossen sind?
 8. ▶ *(neu, v2)* Gibt es eine Datenretention-/Löschpflicht für Engagement-Daten nach Projektabschluss (Kundenschwachstellen-Daten)?
 9. ▶ *(neu, v2)* Genaue Gewichtungsformel für "Kettenabdeckung" in der Priorisierung (Abschnitt 2a/11): reine Zählung betroffener Techniken, oder gewichtet nach Position in der Kette (z. B. früher Breakpoint wertvoller)? Sollte vor Schritt 2 grob festgelegt werden, muss aber nicht in Schritt 1 final sein.
