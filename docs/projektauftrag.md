@@ -1,6 +1,6 @@
 # Projektauftrag für Claude Code: Breakpoint — ATT&CK-to-Action Plattform
 
-> **v3 — ergänzt bei Schritt-2-Planung vom 29.08.2026.** Änderungen sind mit ▶ **Update v3** markiert: eine gezielte, enge Ausnahme von der Offline-Regel für den MITRE-Import (Abschnitt 2, 6a.2, 9). Frühere Änderungen (▶ **Update v2**) stammen aus der Review-Session vom 29.08.2026: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe Abschnitt 2a).
+> **v4 — ergänzt bei Schritt-3-Planung vom 29.08.2026.** Neuer Abschnitt 10b konkretisiert Schritt 3 (Frontend-Anbindung), inkl. zweier dabei gefundener Lücken (fehlender Techniken-Katalog-Endpunkt, fehlendes Vitest-Setup). Frühere Änderungen: ▶ **Update v3** — gezielte, enge Ausnahme von der Offline-Regel für den MITRE-Import (Abschnitt 2, 6a.2, 9). ▶ **Update v2** — aus der Review-Session vom 29.08.2026: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe Abschnitt 2a).
 
 Dieses Dokument ist der vollständige Übergabe-Auftrag, um das bisher als HTML-Mockup validierte Konzept **Breakpoint** ("From Attack Technique to Action") als produktive, im eigenen Datacenter betriebene Anwendung mit Claude Code umzusetzen. Es enthält Kontext, Architekturentscheidungen, Datenmodell, Modulübersicht und einen konkret ausführbaren **Schritt 1**.
 
@@ -472,10 +472,72 @@ Geprüft und bewusst **nicht** geändert: kein Unique-Constraint auf `finding(en
 
 ---
 
-## 11. Ausblick Schritt 3+ (grob, nicht Teil des aktuellen Auftrags)
+## 10b. Schritt 3 — konkreter Arbeitsauftrag *(neu, v4)*
+
+**Ziel von Schritt 3:** Die drei in Abschnitt 11 genannten Tabs (Analyzer, Engagements, Techniken-Katalog) zeigen echte Daten vom Schritt-2-Backend statt statischer Platzhalter. Portfolio, Knowledge Base und Reports bleiben `PagePlaceholder` bis Schritt 4/6/7.
+
+**Zwei Lücken beim Planen gefunden, bevor sie mitten in der Umsetzung aufgefallen wären:**
+1. **Kein Backend-Endpunkt für den Techniken-Katalog.** Schritt 2 hat nur `POST /api/analyze` (nimmt konkrete Codes entgegen) gebaut — keinen Endpunkt, der "alle ~188 Techniken mit ihrem Mapping-Status" auflistet. Der Prototyp-Tab "Alle Techniken" (Filter nach Taktik/Status, Badges "Spezifisch"/"Taktik-Standard"/"Kein Mapping") braucht aber genau das. Wird jetzt Teil von Schritt 3 (10b.1).
+2. **Vitest/React Testing Library nie eingerichtet.** Abschnitt 4 legt Vitest als Frontend-Test-Framework fest, Schritt 1 hat aber nur das Vite/React/Tailwind-Grundgerüst aufgesetzt, keinen Testrunner. Wird jetzt Teil von Schritt 3 (10b.5), damit Komponententests nicht ungeschrieben bleiben, nur weil nie ein guter Einstiegspunkt kam.
+
+Außerdem technisch zwingend, aber in der bisherigen Grobplanung nicht explizit erwähnt: **CORS**. Frontend (`127.0.0.1:5173`) und Backend (`127.0.0.1:8000`) sind unterschiedliche Origins — ohne CORS-Konfiguration blockt der Browser jeden Fetch-Aufruf. Ebenfalls Teil von 10b.1.
+
+### 10b.1 Backend-Ergänzungen
+
+- **CORS-Middleware** in `app/main.py`: `allow_origins` explizit auf die Frontend-Dev-URL beschränkt (kein Wildcard `*`) — konsistent mit dem "so eng wie möglich"-Prinzip aus Abschnitt 8.
+- **`GET /api/techniques`** — neuer, leichtgewichtiger Endpunkt für den Katalog-Tab. Bewusst **nicht** durch 188× `resolve_technique()` (das wäre pro Aufruf hunderte Einzelqueries), sondern eine eigene, schlanke Abfrage:
+  ```python
+  class TechniqueSummary(BaseModel):
+      technique_id: str
+      technique_name: str
+      tactic_name: str
+      mapping_source: Literal["specific", "tactic_default"]
+
+  class TechniqueCatalogResult(BaseModel):
+      techniques: list[TechniqueSummary]
+      total: int
+  ```
+  Serverseitige Filter als Query-Parameter (`?tactic=...&status=...&q=...`), analog zu den Filtern im Prototyp-Tab. `mapping_source` wird effizient über eine `LEFT JOIN`/`EXISTS`-Abfrage gegen `technique_capability_mapping` bestimmt (direkt oder über `parent_technique_id`), nicht über die pro-Technik-Fallback-Kette aus 10a.3 — die bleibt dem `/api/analyze`-Pfad vorbehalten, wo tatsächlich vollständige Capability-/Control-Daten gebraucht werden.
+
+### 10b.2 Frontend: API-Client & Typen
+
+- **Typen aus dem OpenAPI-Schema generieren**, nicht von Hand nachpflegen — sonst driften Frontend-Typen und das kanonische Backend-Schema (Abschnitt 2a) unbemerkt auseinander. Ablauf: `python -c "import json; from app.main import app; print(json.dumps(app.openapi()))" > openapi.json` (Backend muss dafür nicht laufen) + `openapi-typescript` als Dev-Dependency, Output nach `frontend/src/lib/api-types.ts`, per `npm run generate-types` — kein manuell gepflegtes Interface, das aus dem Tritt geraten kann.
+- Dünner `fetch`-Wrapper (`frontend/src/lib/api.ts`) mit Basis-URL aus `import.meta.env.VITE_API_BASE_URL` (Default `http://127.0.0.1:8000`), typisiert mit den generierten Typen.
+- **Datenfetching-Bibliothek: TanStack Query.** Begründung: mehrere Seiten (Analyzer, Engagements, Techniken-Katalog, später Portfolio/Reports) brauchen wiederkehrend Loading/Error/Cache-Verhalten für GET/POST-Aufrufe gegen dasselbe Backend — das von Hand mit `useEffect`/`useState` nachzubauen skaliert schlecht und ist fehleranfälliger als eine etablierte, kleine, weit verbreitete Bibliothek. Kein Server-seitiger Zustand, keine Cloud-Abhängigkeit (rein client-seitig) — verträgt sich mit den Rahmenbedingungen aus Abschnitt 2.
+
+### 10b.3 Globaler Engagement-Kontext
+
+Die Topbar hat seit Schritt 1 bereits die UI für eine Engagement-Auswahl ("Kein Engagement ausgewählt"). Schritt 3 macht sie funktional: ein `EngagementContext` (React Context + `localStorage`-Persistenz für das zuletzt gewählte Engagement) hält die `engagement_id` global, damit Analyzer- und Dashboard-Seite sie konsistent lesen können, ohne Props durch den ganzen Baum zu reichen.
+
+### 10b.4 Seiten anbinden
+
+- **Analyzer-Tab**: Textarea + "Analysieren"-Button (1:1 aus dem Prototyp), `POST /api/analyze` über TanStack Query, Rendering von Technik-Karten und priorisierten Maßnahmen aus dem `AnalyzerResult` — dieselben Anzeige-Komponenten werden in 10b.4 auch für die Engagement-Analyse wiederverwendet (Auszahlung des kanonischen Schemas: eine Ergebnis-Komponente, zwei Datenquellen).
+- **Engagements-Tab**: Liste bestehender Engagements, Anlegen-Formular (`POST /api/engagements`), Auswahl setzt den `EngagementContext`; Detailansicht zeigt Findings-Eingabe (`POST /api/engagements/{id}/findings`) und die berechnete Analyse (`GET /api/engagements/{id}/analysis`) — letztere über dieselben Komponenten wie der Analyzer-Tab.
+- **Techniken-Katalog-Tab**: Tabelle gegen `GET /api/techniques`, Filter (Taktik-Dropdown, Status-Dropdown, Suche) als Query-Parameter, Status-Badges wie im Prototyp.
+- **Dashboard**: Stat-Kacheln (aktuell `—`-Platzhalter) zeigen bei gewähltem Engagement echte Zahlen aus dessen Analyse; ohne gewähltes Engagement bleibt der bisherige Hinweistext.
+
+### 10b.5 Tests
+
+- Vitest + React Testing Library + `@testing-library/jest-dom` einrichten (`npm run test`), `msw` (Mock Service Worker) für die API-Mocks in Komponententests — kein echter Backend-Aufruf in Frontend-Tests.
+- Komponententests: Analyzer-Formular (Eingabe → Aufruf → Ergebnis-Rendering), Techniken-Katalog-Filter, Engagement-Anlegen-Formular (Validierungsfehler bei leerem Namen, konsistent mit dem Backend-422 aus Abschnitt 10a.7).
+- Backend: Test für den neuen `GET /api/techniques`-Endpunkt (Filter, Status-Zuordnung, Zählung).
+
+### 10b.6 Definition of Done für Schritt 3
+
+- [ ] CORS erlaubt Frontend-Origin, blockt alles andere
+- [ ] `GET /api/techniques` liefert für alle ~188 Techniken den korrekten Status (spot-check gegen die 10 spezifisch gemappten aus Schritt 1)
+- [ ] Analyzer-Tab liefert für die Prototyp-Beispielkette ein sichtbares Ergebnis ohne Konsolenfehler
+- [ ] Engagement anlegen → Findings hinzufügen → Analyse ansehen funktioniert Ende-zu-Ende im Browser
+- [ ] Techniken-Katalog-Tab filtert nach Taktik und Status
+- [ ] `npm run generate-types` läuft ohne laufenden Server durch und wird nicht manuell umgangen
+- [ ] `npm run test` (Vitest) grün, `pytest` weiterhin grün
+
+---
+
+## 11. Ausblick Schritt 4+ (grob, nicht Teil des aktuellen Auftrags)
 
 - **Schritt 2:** ✅ siehe Abschnitt 10a (konkretisiert)
-- **Schritt 3:** Frontend-Tabs an echte Backend-Endpunkte anbinden (Analyzer, Engagements, Techniken-Katalog)
+- **Schritt 3:** ✅ siehe Abschnitt 10b (konkretisiert)
 - **Schritt 4:** Portfolio-Modul inkl. Coverage-Matrix, Gap-Analyse, **Admin-Bereich mit Self-Service-CRUD** (Abschnitt 6a.1)
 - **Schritt 5:** PydanticAI-Sales-Briefing-Modul gegen interne LLM-Plattform (siehe Abschnitt 7), inkl. Post-Processing-Guard und asynchroner Verarbeitung
 - **Schritt 6:** **Admin-Bereich MITRE-Techniken-Import** mit Upload, Diff-Ansicht, Versionierung/Rollback (Abschnitt 6a.2), STIX-Relationship-basierte Sub-Technique-Zuordnung
