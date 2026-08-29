@@ -63,9 +63,9 @@ export function Sidebar() {
       </NavGroup>
 
       <div className="mt-auto rounded-md border border-line-soft bg-graphite-850 p-3">
-        <div className="text-[12.5px] font-semibold text-ink-100">Schritt 1 · Grundgerüst</div>
+        <div className="text-[12.5px] font-semibold text-ink-100">Schritt 3 · Frontend-Anbindung</div>
         <div className="mt-1 text-[11.5px] leading-relaxed text-ink-400">
-          Analyzer-Logik und Backend-Anbindung folgen in Schritt 2.
+          Portfolio-Fit, Sales-Briefing und Admin-Bereich folgen in Schritt 4+.
         </div>
       </div>
     </aside>

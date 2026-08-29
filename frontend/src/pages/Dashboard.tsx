@@ -1,22 +1,45 @@
-const stats = [
-  { label: 'ATT&CK Techniques', value: '—' },
-  { label: 'Sub-Techniques', value: '—' },
-  { label: 'Angriffsketten', value: '—' },
-  { label: 'Priorisierte Maßnahmen', value: '—' },
-]
+import { useQuery } from '@tanstack/react-query'
+
+import { getEngagementAnalysis, listEngagements } from '../lib/api'
+import { useEngagement } from '../lib/EngagementContext'
 
 export function Dashboard() {
+  const { engagementId } = useEngagement()
+
+  const { data: engagements } = useQuery({ queryKey: ['engagements'], queryFn: listEngagements })
+  const { data: analysis } = useQuery({
+    queryKey: ['engagement-analysis', engagementId],
+    queryFn: () => getEngagementAnalysis(engagementId!),
+    enabled: engagementId !== null,
+  })
+
+  const engagement = engagements?.find((e) => e.id === engagementId)
+
+  const subTechniqueCount = analysis?.techniques.filter((t) => t.technique_id.includes('.')).length ?? 0
+
+  const stats = [
+    { label: 'ATT&CK Techniques', value: analysis ? String(analysis.techniques.length) : '—' },
+    { label: 'Sub-Techniques', value: analysis ? String(subTechniqueCount) : '—' },
+    // Angriffsketten-Erkennung ist Teil der Visualisierungs-Komponente (Abschnitt 6,
+    // Modul 5) und noch nicht gebaut — kein erfundener Wert, bewusst weiterhin "—".
+    { label: 'Angriffsketten', value: '—' },
+    {
+      label: 'Priorisierte Maßnahmen',
+      value: analysis ? String(analysis.prioritized_measures.length) : '—',
+    },
+  ]
+
   return (
     <div className="flex flex-col gap-7">
       <div>
         <div className="mb-2 text-[11px] font-semibold tracking-wider text-amber uppercase">
-          Kein aktives Engagement
+          {engagement ? `Engagement · ${engagement.name}` : 'Kein aktives Engagement'}
         </div>
         <h1 className="font-display text-[27px] font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-ink-300">
-          Sobald ein Engagement angelegt und Techniken importiert wurden, erscheinen hier
-          Coverage, Angriffskette und priorisierte Maßnahmen. In Schritt 1 ist dies noch eine
-          statische Ansicht ohne Backend-Anbindung.
+          {engagement
+            ? 'Kennzahlen aus der aktuellen Analyse des gewählten Engagements.'
+            : 'Wähle oben in der Kopfzeile ein Engagement aus, um Kennzahlen aus dessen Analyse zu sehen.'}
         </p>
 
         <div className="mt-5 grid grid-cols-4 gap-px overflow-hidden rounded-lg border border-line bg-line">
@@ -32,7 +55,7 @@ export function Dashboard() {
       <div className="rounded-lg border border-line bg-graphite-900 p-6">
         <div className="mb-4 text-[15px] font-semibold">ATT&amp;CK Coverage</div>
         <div className="text-[12.5px] text-ink-600">
-          Wird in Schritt 2 aus echten Engagement-Findings berechnet.
+          Wird in einem späteren Schritt aus Engagement-Findings je Taktik berechnet.
         </div>
       </div>
     </div>

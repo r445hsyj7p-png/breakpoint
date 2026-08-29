@@ -11,6 +11,16 @@ def test_create_engagement_rejects_empty_name(db_session):
     assert response.status_code == 422
 
 
+def test_list_engagements_returns_newest_first(db_session):
+    run_seed()
+    client = TestClient(app)
+    client.post("/api/engagements", json={"name": "Erstes"})
+    client.post("/api/engagements", json={"name": "Zweites"})
+
+    body = client.get("/api/engagements").json()
+    assert [e["name"] for e in body] == ["Zweites", "Erstes"]
+
+
 def test_engagement_lifecycle_create_findings_analysis(db_session):
     run_seed()
     client = TestClient(app)

@@ -23,6 +23,13 @@ def _get_engagement_or_404(db: Session, engagement_id: int) -> Engagement:
     return engagement
 
 
+@router.get("", response_model=list[EngagementRead])
+def list_engagements(db: Session = Depends(get_db)) -> list[Engagement]:
+    # Sortierung nach id statt created_at: id ist monoton und kollisionsfrei,
+    # zwei Engagements könnten sonst (v.a. im Test) dieselbe now()-Sekunde treffen.
+    return db.query(Engagement).order_by(Engagement.id.desc()).all()
+
+
 @router.post("", response_model=EngagementRead, status_code=201)
 def create_engagement(payload: EngagementCreate, db: Session = Depends(get_db)) -> Engagement:
     engagement = Engagement(name=payload.name, external_ref=payload.external_ref)

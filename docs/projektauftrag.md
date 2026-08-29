@@ -524,13 +524,15 @@ Die Topbar hat seit Schritt 1 bereits die UI für eine Engagement-Auswahl ("Kein
 
 ### 10b.6 Definition of Done für Schritt 3
 
-- [ ] CORS erlaubt Frontend-Origin, blockt alles andere
-- [ ] `GET /api/techniques` liefert für alle ~188 Techniken den korrekten Status (spot-check gegen die 10 spezifisch gemappten aus Schritt 1)
-- [ ] Analyzer-Tab liefert für die Prototyp-Beispielkette ein sichtbares Ergebnis ohne Konsolenfehler
-- [ ] Engagement anlegen → Findings hinzufügen → Analyse ansehen funktioniert Ende-zu-Ende im Browser
-- [ ] Techniken-Katalog-Tab filtert nach Taktik und Status
-- [ ] `npm run generate-types` läuft ohne laufenden Server durch und wird nicht manuell umgangen
-- [ ] `npm run test` (Vitest) grün, `pytest` weiterhin grün
+- [x] CORS erlaubt Frontend-Origin, blockt alles andere (enge Allowlist, kein Wildcard)
+- [x] `GET /api/techniques` liefert für alle 188 Techniken den korrekten Status (10 spezifisch = exakt die KB-Einträge aus Schritt 1, Rest Taktik-Standard)
+- [x] Analyzer-Tab liefert für die Prototyp-Beispielkette ein sichtbares Ergebnis ohne Konsolenfehler (im Browser mit Playwright end-to-end verifiziert)
+- [x] Engagement anlegen → Findings hinzufügen → Analyse ansehen funktioniert Ende-zu-Ende im Browser (inkl. Kettenabdeckung über mehrere Techniken hinweg sichtbar geprüft)
+- [x] Techniken-Katalog-Tab filtert nach Taktik und Status (sowie Suche — im Browser geprüft: 188→10 bei Taktik-Filter, 188→10 bei Status-Filter, 188→4 bei Suche)
+- [x] `npm run generate-types` läuft ohne laufenden Server durch und wird nicht manuell umgangen
+- [x] `npm run test` (Vitest, 6 Tests) grün, `pytest` (32 Tests) weiterhin grün, `ruff` und `oxlint` sauber
+
+**Ergebnis der kritischen Review-Runde nach Implementierung** *(neu, v4)*: Eine dritte Lücke zusätzlich zu den beiden bereits beim Planen gefundenen (10a-Intro): Es gab keinen `GET /api/engagements`-Listen-Endpunkt, den der Engagements-Tab aber braucht — ergänzt, sortiert nach `id` statt `created_at` (kollisionsfrei, statt auf Sekunden-Auflösung von `now()` zu vertrauen). Weitere Funde: `GET /api/techniques` erzeugte durch `joinedload()` zusätzlich zu einem expliziten Taktik-Filter-Join einen doppelten JOIN auf `tactic` — behoben durch `contains_eager()`, das den ohnehin nötigen Join wiederverwendet. Fehlende Fehleranzeige bei fehlgeschlagenem Engagement-Anlegen bzw. Findings-Hinzufügen im Frontend ergänzt (Konsistenz mit dem Analyzer-Tab). Veralteten "Schritt 1"-Hinweistext in der Sidebar aktualisiert.
 
 ---
 
