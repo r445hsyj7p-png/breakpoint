@@ -1,6 +1,6 @@
 # Projektauftrag für Claude Code: Breakpoint — ATT&CK-to-Action Plattform
 
-> **v6 — ergänzt am 29.08.2026.** Neuer Abschnitt 6a.3 plant die Nutzung offizieller MITRE-Mitigations (M-Nummern) als Bootstrap für spezifische Mappings (Teil von Schritt 6, kritisch hinterfragt: nur Prevent, kein Impact/Effort von MITRE, nicht jede Mitigation bildet sauber auf eine Capability ab, dritter `mapping_source`-Wert nötig). Dabei ein konkreter Code-Fund: `resolve_technique()` schreibt `mapping_source` aktuell als hartkodierten String statt den Wert aus der DB zu lesen — muss vor Schritt 6 behoben werden, sonst würden künftige `mitre_derived`-Zeilen fälschlich als `specific` ausgegeben. Frühere Änderungen: ▶ **Update v5** — Abschnitt 10c konkretisiert Schritt 4 (Portfolio-Modul). ▶ **Update v4** — Abschnitt 10b konkretisiert Schritt 3 (Frontend-Anbindung). ▶ **Update v3** — gezielte, enge Ausnahme von der Offline-Regel für den MITRE-Import (Abschnitt 2, 6a.2, 9). ▶ **Update v2** — aus der Review-Session vom 29.08.2026: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe Abschnitt 2a).
+> **v7 — ergänzt am 29.08.2026.** Neuer Abschnitt 10d konkretisiert Schritt 5 (Sales-Briefing/PydanticAI): async ohne neue Infrastruktur (FastAPI `BackgroundTasks` statt Task-Queue, Grenzen dokumentiert), LLM-Anbindung als ungeklärte Annahme markiert (offene Frage 1 aus Abschnitt 12 bleibt offen), Post-Processing-Guard testbar ohne echte LLM-Anbindung dank PydanticAI `TestModel`/`FunctionModel`. Frühere Änderungen: ▶ **Update v6** — Abschnitt 6a.3 plant die Nutzung offizieller MITRE-Mitigations (M-Nummern) als Bootstrap für spezifische Mappings, inkl. eines konkreten Code-Funds (`resolve_technique()` schreibt `mapping_source` hartkodiert statt aus der DB zu lesen — muss vor Schritt 6 behoben werden). ▶ **Update v5** — Abschnitt 10c konkretisiert Schritt 4 (Portfolio-Modul). ▶ **Update v4** — Abschnitt 10b konkretisiert Schritt 3 (Frontend-Anbindung). ▶ **Update v3** — gezielte, enge Ausnahme von der Offline-Regel für den MITRE-Import (Abschnitt 2, 6a.2, 9). ▶ **Update v2** — aus der Review-Session vom 29.08.2026: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe Abschnitt 2a).
 
 Dieses Dokument ist der vollständige Übergabe-Auftrag, um das bisher als HTML-Mockup validierte Konzept **Breakpoint** ("From Attack Technique to Action") als produktive, im eigenen Datacenter betriebene Anwendung mit Claude Code umzusetzen. Es enthält Kontext, Architekturentscheidungen, Datenmodell, Modulübersicht und einen konkret ausführbaren **Schritt 1**.
 
@@ -620,12 +620,68 @@ Fehlende Fehleranzeige bei fehlgeschlagenem Bearbeiten/Deaktivieren im Frontend 
 
 ---
 
-## 11. Ausblick Schritt 5+ (grob, nicht Teil des aktuellen Auftrags)
+## 10d. Schritt 5 — konkreter Arbeitsauftrag *(neu, v7)*
+
+**Ziel von Schritt 5:** Aus dem kanonischen Analyzer-Ergebnis (inkl. `portfolio_fit` seit Schritt 4) eine geschäftssprachliche Sales-Argumentation generieren — PydanticAI gegen die interne LLM-Plattform, mit den in Abschnitt 7 skizzierten Guardrails.
+
+**Kritisch vorab geklärt, bevor gebaut wurde:**
+
+1. ▶ **Offene Frage 1 (Abschnitt 12) ist weiterhin ungeklärt** — wie die interne LLM-Plattform genau angesprochen wird, ist nicht bekannt. Umgesetzt wird gegen die **wahrscheinlichste Form** (OpenAI-kompatible Chat-Completions-API, via `OpenAIChatModel` + `OpenAIProvider(base_url=…, api_key=…)` aus PydanticAI 2.x — beides über Env-Variablen konfigurierbar, `LLM_PLATFORM_BASE_URL` liegt seit Schritt 1 als Platzhalter bereit). **Das ist eine Annahme, keine bestätigte Integration** — kann erst gegen die echte Plattform verifiziert werden, sobald Frage 1 beantwortet ist. Ohne konfigurierte Basis-URL schlägt die Generierung mit einer klaren Fehlermeldung fehl (kein stiller Fallback auf irgendeinen öffentlichen Anbieter — das wäre ein Verstoß gegen Abschnitt 2).
+2. **Async-Umsetzung bewusst ohne neue Infrastruktur.** Abschnitt 7 verlangt "asynchrone Verarbeitung, kein blockierender Request/Response-Zyklus" — das liest sich nach Task-Queue (Celery/arq + Redis + Worker-Container). Umgesetzt wird stattdessen mit FastAPIs eingebauten `BackgroundTasks`: der Endpoint legt sofort eine `sales_briefing`-Zeile mit `status='pending'` an und gibt `202` zurück, die Generierung läuft im selben Prozess weiter, das Frontend pollt den Status. **Bekannte Grenze, nicht verschwiegen:** stürzt der Uvicorn-Worker während der Generierung ab, geht der Task verloren (kein Redo, kein Redis-Persistenz). Für den aktuellen Maßstab (ein Sales-Briefing pro Engagement, kein Hochlastszenario) akzeptabel; eine echte Task-Queue ist der klare Ausbaupfad, sobald Volumen/Laufzeit das rechtfertigen — nicht vorab bauen (YAGNI).
+3. **`flagged_for_review` versteckt den Inhalt nicht, markiert ihn nur.** Der Post-Processing-Guard (Abschnitt 7) soll verhindern, dass ein Briefing mit T-Nummer "ungeprüft ausgeliefert" wird — ohne RBAC (Schritt 7 fehlt noch) kann aber niemand technisch von "Sales sieht das nicht" unterschieden werden. Der Inhalt bleibt sichtbar (sonst könnte niemand die "Nachbearbeitung" überhaupt vornehmen), aber unübersehbar als nicht freigegeben markiert. Konsistent mit der bereits mehrfach dokumentierten Lücke "kein Auth vor Schritt 7".
+4. **Portfolio-Fit darf in den LLM-Input, das ist kein Widerstand gegen Abschnitt 2a.** "Kein reiner Produktverkauf" verbietet, dass Portfolio-Fit die *Priorisierung* beeinflusst (bleibt unverändert, Schritt 4) — nicht, dass Sales erfährt, welche bereits vorhandene Technologie eine Lücke schließt. Der bestehende System-Prompt-Guardrail ("nutze ausschließlich die im Input gelieferten Fakten") deckt das bereits ab, keine neue Regel nötig.
+
+### 10d.1 Datenmodell-Ergänzung
+
+```
+sales_briefing
+  id (PK), engagement_id (FK),
+  status ENUM('pending','ready','flagged_for_review','failed'),
+  model_version, content (JSONB — serialisiertes SalesBriefing-Schema, nullable bis fertig),
+  error_message (nullable), generated_at (nullable),
+  reviewed_by (nullable, Freitext bis Schritt 7 — analog portfolio_technology_history.changed_by),
+  reviewed_at (nullable)
+```
+
+Jede Generierung legt eine **neue** Zeile an (append-only, kein Update bestehender Inhalte) — das ist die in Abschnitt 5/7 geforderte Versionierung. `GET .../sales-briefings` liefert die volle Historie, `GET .../sales-briefing` nur die neueste Zeile.
+
+### 10d.2 PydanticAI-Anbindung (`app/services/sales_briefing.py`)
+
+- `SalesBriefing`/`MassnahmeArgumentation` als Pydantic-Schemas exakt wie in Abschnitt 7 skizziert.
+- Agent-Konstruktion **parametrisiert über das Model-Objekt**, nicht fest verdrahtet — Produktivbetrieb nutzt `OpenAIChatModel(settings.llm_platform_model_name, provider=OpenAIProvider(base_url=settings.llm_platform_base_url, api_key=settings.llm_platform_api_key))`, Tests nutzen `pydantic_ai.models.test.TestModel()`/`FunctionModel()` — kein Netzwerkzugriff nötig, um die Guardrail-Logik zu verifizieren (bewusster Vorteil von PydanticAIs Design, hier direkt genutzt statt selbst nachzubauen).
+- **Input**: `AnalyzerResult.model_dump_json()` — dasselbe kanonische Schema wie Analyst-UI, keine separate Aufbereitung (Abschnitt 2a-Auszahlung, wie schon bei `portfolio_fit`).
+- **Post-Processing-Guard**: Regex `T\d{4}(\.\d{3})?` über alle Textfelder des generierten `SalesBriefing` (rekursiv über `executive_summary`, jede `MassnahmeArgumentation`, `naechster_schritt`) — Treffer → `status='flagged_for_review'` statt `'ready'`.
+
+### 10d.3 Endpunkte (`app/api/sales_briefing.py`)
+
+- `POST /api/engagements/{id}/sales-briefing` — legt `pending`-Zeile an, startet `BackgroundTasks`-Job, `202`
+- `GET /api/engagements/{id}/sales-briefing` — neueste Zeile (`404` falls noch keine existiert)
+- `GET /api/engagements/{id}/sales-briefings` — volle Historie
+- `POST /api/sales-briefings/{id}/mark-reviewed` — setzt `reviewed_by` (Freitext) + `reviewed_at`
+
+### 10d.4 Frontend
+
+Neuer Abschnitt in der Engagement-Detailansicht (nicht der `Reports`-Tab — der ist Schritt 7s Export, das hier ist eine live generierte, engagement-gebundene Ansicht): "Sales-Briefing generieren"-Button → Statusanzeige (`pending` gepollt via TanStack Query `refetchInterval`) → Executive Summary, priorisierte Maßnahmen mit Kundennutzen/Risiko/Einwand-Antizipation, "Nächster Schritt". Deutliche Warnung bei `flagged_for_review`. "Als geprüft freigeben"-Button.
+
+### 10d.5 Definition of Done für Schritt 5
+
+- [ ] Migration für `sales_briefing` läuft durch
+- [ ] Generierung mit `TestModel` liefert `status='ready'` und befüllten Content für ein Beispiel-Engagement
+- [ ] Post-Processing-Guard: ein `FunctionModel`, das absichtlich eine T-Nummer ins Ergebnis schreibt, erzeugt `status='flagged_for_review'`, kein `'ready'`
+- [ ] Fehlerfall (Agent wirft Exception) landet als `status='failed'` mit `error_message`, kein unbehandelter 500er im Hintergrund-Task
+- [ ] Ohne konfigurierte `LLM_PLATFORM_BASE_URL` liefert der Endpoint einen klaren Fehler, keinen stillen Fallback
+- [ ] `mark-reviewed` setzt `reviewed_by`/`reviewed_at`
+- [ ] Frontend zeigt Pending → Ready/Flagged-Übergang ohne manuelles Neuladen (Polling)
+- [ ] `pytest`, `npm run test`, `ruff`, `oxlint`, `tsc -b`, `npm run build` weiterhin grün
+
+---
+
+## 11. Ausblick Schritt 6+ (grob, nicht Teil des aktuellen Auftrags)
 
 - **Schritt 2:** ✅ siehe Abschnitt 10a (konkretisiert)
 - **Schritt 3:** ✅ siehe Abschnitt 10b (konkretisiert)
 - **Schritt 4:** ✅ siehe Abschnitt 10c (konkretisiert)
-- **Schritt 5:** PydanticAI-Sales-Briefing-Modul gegen interne LLM-Plattform (siehe Abschnitt 7), inkl. Post-Processing-Guard und asynchroner Verarbeitung
+- **Schritt 5:** ✅ siehe Abschnitt 10d (konkretisiert)
 - **Schritt 6:** **Admin-Bereich MITRE-Techniken-Import** mit Upload, Diff-Ansicht, Versionierung/Rollback (Abschnitt 6a.2), STIX-Relationship-basierte Sub-Technique-Zuordnung, **plus MITRE-Mitigations-Bootstrap** (Abschnitt 6a.3, eigener Teilschritt, kritisch vorab geklärte Einschränkungen)
 - **Schritt 7:** Reporting/Export, Rollenmodell/Auth-Anbindung, Audit-Log-UI
 
