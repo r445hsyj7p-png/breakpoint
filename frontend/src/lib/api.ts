@@ -13,6 +13,7 @@ export type PortfolioTechnologyHistoryEntry = components['schemas']['PortfolioTe
 export type CoverageResult = components['schemas']['CoverageResult']
 export type CoverageRow = components['schemas']['CoverageRow']
 export type CapabilityRead = components['schemas']['CapabilityRead']
+export type SalesBriefingRead = components['schemas']['SalesBriefingRead']
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 
@@ -108,4 +109,31 @@ export function getPortfolioCoverage(): Promise<CoverageResult> {
 
 export function listCapabilities(): Promise<CapabilityRead[]> {
   return request('/api/capabilities')
+}
+
+export function triggerSalesBriefing(engagementId: number): Promise<SalesBriefingRead> {
+  return request(`/api/engagements/${engagementId}/sales-briefing`, { method: 'POST' })
+}
+
+export async function getLatestSalesBriefing(engagementId: number): Promise<SalesBriefingRead | null> {
+  try {
+    return await request(`/api/engagements/${engagementId}/sales-briefing`)
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null
+    throw err
+  }
+}
+
+export function listSalesBriefings(engagementId: number): Promise<SalesBriefingRead[]> {
+  return request(`/api/engagements/${engagementId}/sales-briefings`)
+}
+
+export function markSalesBriefingReviewed(
+  briefingId: number,
+  reviewedBy?: string,
+): Promise<SalesBriefingRead> {
+  return request(`/api/sales-briefings/${briefingId}/mark-reviewed`, {
+    method: 'POST',
+    body: JSON.stringify({ reviewed_by: reviewedBy ?? null }),
+  })
 }

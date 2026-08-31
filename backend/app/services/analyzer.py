@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from app.models import TacticDefaultMapping, Technique, TechniqueCapabilityMapping
+from app.models import Finding, TacticDefaultMapping, Technique, TechniqueCapabilityMapping
 from app.schemas.analyzer import (
     AnalyzerResult,
     ControlRef,
@@ -163,3 +163,19 @@ def analyze(db: Session, codes: list[str]) -> AnalyzerResult:
         unknown_codes=unknown_codes,
         prioritized_measures=_prioritize(techniques),
     )
+
+
+def analyze_engagement(db: Session, engagement_id: int) -> AnalyzerResult:
+    """Analysiert alle für ein Engagement erfassten Findings. Wiederverwendet
+    von der Analyse-API (app/api/engagements.py) und dem Sales-Briefing-Service
+    (app/services/sales_briefing.py), damit die Finding->Analyse-Logik nicht
+    dupliziert wird."""
+    codes = [
+        technique_id
+        for (technique_id,) in db.query(Finding.technique_id)
+        .filter_by(engagement_id=engagement_id)
+        .distinct()
+        .order_by(Finding.technique_id)
+        .all()
+    ]
+    return analyze(db, codes)

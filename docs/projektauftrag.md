@@ -1,6 +1,6 @@
 # Projektauftrag für Claude Code: Breakpoint — ATT&CK-to-Action Plattform
 
-> **v7 — ergänzt am 29.08.2026.** Neuer Abschnitt 10d konkretisiert Schritt 5 (Sales-Briefing/PydanticAI): async ohne neue Infrastruktur (FastAPI `BackgroundTasks` statt Task-Queue, Grenzen dokumentiert), LLM-Anbindung als ungeklärte Annahme markiert (offene Frage 1 aus Abschnitt 12 bleibt offen), Post-Processing-Guard testbar ohne echte LLM-Anbindung dank PydanticAI `TestModel`/`FunctionModel`. Frühere Änderungen: ▶ **Update v6** — Abschnitt 6a.3 plant die Nutzung offizieller MITRE-Mitigations (M-Nummern) als Bootstrap für spezifische Mappings, inkl. eines konkreten Code-Funds (`resolve_technique()` schreibt `mapping_source` hartkodiert statt aus der DB zu lesen — muss vor Schritt 6 behoben werden). ▶ **Update v5** — Abschnitt 10c konkretisiert Schritt 4 (Portfolio-Modul). ▶ **Update v4** — Abschnitt 10b konkretisiert Schritt 3 (Frontend-Anbindung). ▶ **Update v3** — gezielte, enge Ausnahme von der Offline-Regel für den MITRE-Import (Abschnitt 2, 6a.2, 9). ▶ **Update v2** — aus der Review-Session vom 29.08.2026: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe Abschnitt 2a).
+> **v8 — ergänzt am 31.08.2026.** Schritt 5 (Sales-Briefing) umgesetzt, kritisch geprüft und Bugs behoben — Details in Abschnitt 10d.5 (DoD jetzt vollständig abgehakt inkl. Review-Ergebnis). Frühere Änderungen: ▶ **Update v7** — Abschnitt 10d konkretisierte Schritt 5 (Sales-Briefing/PydanticAI) im Vorfeld der Umsetzung: async ohne neue Infrastruktur (FastAPI `BackgroundTasks` statt Task-Queue, Grenzen dokumentiert), LLM-Anbindung als ungeklärte Annahme markiert (offene Frage 1 aus Abschnitt 12 bleibt offen), Post-Processing-Guard testbar ohne echte LLM-Anbindung dank PydanticAI `TestModel`/`FunctionModel`. ▶ **Update v6** — Abschnitt 6a.3 plant die Nutzung offizieller MITRE-Mitigations (M-Nummern) als Bootstrap für spezifische Mappings, inkl. eines konkreten Code-Funds (`resolve_technique()` schreibt `mapping_source` hartkodiert statt aus der DB zu lesen — muss vor Schritt 6 behoben werden). ▶ **Update v5** — Abschnitt 10c konkretisiert Schritt 4 (Portfolio-Modul). ▶ **Update v4** — Abschnitt 10b konkretisiert Schritt 3 (Frontend-Anbindung). ▶ **Update v3** — gezielte, enge Ausnahme von der Offline-Regel für den MITRE-Import (Abschnitt 2, 6a.2, 9). ▶ **Update v2** — aus der Review-Session vom 29.08.2026: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe Abschnitt 2a).
 
 Dieses Dokument ist der vollständige Übergabe-Auftrag, um das bisher als HTML-Mockup validierte Konzept **Breakpoint** ("From Attack Technique to Action") als produktive, im eigenen Datacenter betriebene Anwendung mit Claude Code umzusetzen. Es enthält Kontext, Architekturentscheidungen, Datenmodell, Modulübersicht und einen konkret ausführbaren **Schritt 1**.
 
@@ -665,14 +665,67 @@ Neuer Abschnitt in der Engagement-Detailansicht (nicht der `Reports`-Tab — der
 
 ### 10d.5 Definition of Done für Schritt 5
 
-- [ ] Migration für `sales_briefing` läuft durch
-- [ ] Generierung mit `TestModel` liefert `status='ready'` und befüllten Content für ein Beispiel-Engagement
-- [ ] Post-Processing-Guard: ein `FunctionModel`, das absichtlich eine T-Nummer ins Ergebnis schreibt, erzeugt `status='flagged_for_review'`, kein `'ready'`
-- [ ] Fehlerfall (Agent wirft Exception) landet als `status='failed'` mit `error_message`, kein unbehandelter 500er im Hintergrund-Task
-- [ ] Ohne konfigurierte `LLM_PLATFORM_BASE_URL` liefert der Endpoint einen klaren Fehler, keinen stillen Fallback
-- [ ] `mark-reviewed` setzt `reviewed_by`/`reviewed_at`
-- [ ] Frontend zeigt Pending → Ready/Flagged-Übergang ohne manuelles Neuladen (Polling)
-- [ ] `pytest`, `npm run test`, `ruff`, `oxlint`, `tsc -b`, `npm run build` weiterhin grün
+- [x] Migration für `sales_briefing` läuft durch
+- [x] Generierung mit `TestModel` liefert `status='ready'` und befüllten Content für ein Beispiel-Engagement
+- [x] Post-Processing-Guard: ein `FunctionModel`, das absichtlich eine T-Nummer ins Ergebnis schreibt, erzeugt `status='flagged_for_review'`, kein `'ready'`
+- [x] Fehlerfall (Agent wirft Exception) landet als `status='failed'` mit `error_message`, kein unbehandelter 500er im Hintergrund-Task
+- [x] Ohne konfigurierte `LLM_PLATFORM_BASE_URL` liefert der Endpoint einen klaren Fehler, keinen stillen Fallback
+- [x] `mark-reviewed` setzt `reviewed_by`/`reviewed_at`
+- [x] Frontend zeigt Pending → Ready/Flagged-Übergang ohne manuelles Neuladen (Polling)
+- [x] `pytest`, `npm run test`, `ruff`, `oxlint`, `tsc -b`, `npm run build` weiterhin grün
+
+**Ergebnis der kritischen Review-Runde:**
+
+Implementiert wurde: SQLAlchemy-Modell + Alembic-Migration für `sales_briefing`
+(append-only, `SalesBriefingStatus`-Enum); `app/services/analyzer.py` um
+`analyze_engagement()` erweitert (Finding→Analyse-Logik aus
+`get_engagement_analysis()` extrahiert, damit Sales-Briefing-Service und
+Analyse-Endpoint sie gemeinsam nutzen, statt sie zu duplizieren);
+`app/services/sales_briefing.py` mit `build_agent()` (test-injizierbares
+Model-Argument, produktiv `OpenAIChatModel`/`OpenAIProvider` gegen die
+interne Plattform), Post-Processing-Guard (`contains_technique_id()`,
+Regex `T\d{4}(\.\d{3})?`) und `generate_sales_briefing()`
+(Fehlerbehandlung fängt jede Exception ab, setzt `status='failed'` +
+`error_message`, committet immer); vier Endpunkte in
+`app/api/sales_briefing.py` (`POST .../sales-briefing` mit
+`BackgroundTasks` + eigener DB-Session — die Request-Session ist nach
+Response-Versand geschlossen —, `GET .../sales-briefing`,
+`GET .../sales-briefings`, `POST /api/sales-briefings/{id}/mark-reviewed`);
+Frontend-Sektion `SalesBriefingSection.tsx` in der Engagement-Detailansicht
+mit TanStack-Query-Polling (`refetchInterval`, nur solange `status='pending'`).
+
+Bei der Review gefundene und behobene Bugs (echte Funde, keine
+kosmetischen Änderungen):
+1. **"Als geprüft freigeben"-Button erschien auch bei `status='failed'`.**
+   Ursprünglich zeigte die Bedingung `briefing.status !== 'pending'` den
+   Freigabe-Button für jeden nicht-pending-Status, also auch für
+   fehlgeschlagene Generierungen ohne jeden Inhalt — ein Techniker hätte
+   dort fälschlich etwas "freigeben" können, das nie generiert wurde.
+   Eingegrenzt auf `status === 'ready' || status === 'flagged_for_review'`.
+   Gefunden durch manuellen Playwright-Check im Browser (Screenshot zeigte
+   den Button neben der Fehlermeldung), nicht durch die automatisierten
+   Tests — kein Test deckte diese UI-Bedingung ab.
+2. **Sidebar-Footer verwies noch auf Schritt 4.** Analog zu den vorherigen
+   Schritten aktualisiert auf "Schritt 5 · Sales-Briefing" mit Ausblick auf
+   Schritt 6 (MITRE-Import/Mitigations-Bootstrap, Auth).
+
+Der Fail-Fast-Pfad ohne konfigurierte `LLM_PLATFORM_BASE_URL` wurde
+zusätzlich end-to-end im Browser gegen echtes Backend + Frontend verifiziert
+(nicht nur in Tests): Engagement anlegen, Finding hinzufügen,
+"Sales-Briefing generieren" klicken → sichtbar `status='failed'` mit der
+erwarteten deutschen Fehlermeldung, kein stiller Fallback, keine
+unbehandelte Exception im Hintergrund-Task. Die `ready`/`flagged_for_review`-
+Übergänge wurden nicht gegen eine echte LLM-Plattform verifiziert (offene
+Frage 1 aus Abschnitt 12 bleibt ungeklärt), sondern wie geplant über
+PydanticAIs `TestModel`/`FunctionModel` — sowohl in Backend-Unittests
+(`test_sales_briefing_service.py`) als auch in Backend-API-Tests
+(`test_api_sales_briefing.py`, `build_agent` dort per `monkeypatch`
+überschrieben) und in zwei neuen Frontend-Vitest-Tests
+(`Engagements.test.tsx`, MSW-Mocks für den vollen Pending→Ready-Zyklus).
+
+64 Backend-Tests + 10 Frontend-Tests grün, `ruff check app/` (Scope wie in
+den vorherigen Schritten) und `oxlint`/`tsc -b --noEmit`/`npm run build`
+fehlerfrei.
 
 ---
 

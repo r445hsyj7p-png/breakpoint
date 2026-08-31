@@ -237,6 +237,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/engagements/{engagement_id}/sales-briefing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Latest Sales Briefing */
+        get: operations["get_latest_sales_briefing_api_engagements__engagement_id__sales_briefing_get"];
+        put?: never;
+        /**
+         * Post Sales Briefing
+         * @description Legt sofort eine pending-Zeile an und gibt 202 zurück; die eigentliche
+         *     Generierung läuft asynchron im Hintergrund (Abschnitt 10d.2, Frage 2 —
+         *     bewusst ohne Task-Queue-Infrastruktur, mit dokumentierter Grenze).
+         */
+        post: operations["post_sales_briefing_api_engagements__engagement_id__sales_briefing_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/engagements/{engagement_id}/sales-briefings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sales Briefings */
+        get: operations["list_sales_briefings_api_engagements__engagement_id__sales_briefings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-briefings/{briefing_id}/mark-reviewed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Mark Reviewed */
+        post: operations["post_mark_reviewed_api_sales_briefings__briefing_id__mark_reviewed_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -325,6 +382,28 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** MarkReviewedRequest */
+        MarkReviewedRequest: {
+            /** Reviewed By */
+            reviewed_by?: string | null;
+        };
+        /** MassnahmeArgumentation */
+        MassnahmeArgumentation: {
+            /** Massnahme */
+            massnahme: string;
+            /**
+             * Kunden Nutzen
+             * @description 1-2 Sätze, Geschäftssprache, keine Fachbegriffe
+             */
+            kunden_nutzen: string;
+            /** Risiko Ohne Massnahme */
+            risiko_ohne_massnahme: string;
+            /**
+             * Einwand Antizipation
+             * @description Ein wahrscheinlicher Kundeneinwand + Gegenargument
+             */
+            einwand_antizipation: string;
+        };
         /** PortfolioTechnologyCreate */
         PortfolioTechnologyCreate: {
             /** Name */
@@ -398,6 +477,46 @@ export interface components {
             chain_coverage_count: number;
             /** Affected Technique Ids */
             affected_technique_ids: string[];
+        };
+        /** SalesBriefing */
+        SalesBriefing: {
+            /**
+             * Executive Summary
+             * @description 3-4 Sätze, für Geschäftsführung
+             */
+            executive_summary: string;
+            /** Top Massnahmen */
+            top_massnahmen: components["schemas"]["MassnahmeArgumentation"][];
+            /** Naechster Schritt */
+            naechster_schritt: string;
+        };
+        /** SalesBriefingRead */
+        SalesBriefingRead: {
+            /** Id */
+            id: number;
+            /** Engagement Id */
+            engagement_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "ready" | "flagged_for_review" | "failed";
+            /** Model Version */
+            model_version: string | null;
+            content: components["schemas"]["SalesBriefing"] | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Generated At */
+            generated_at: string | null;
+            /** Reviewed By */
+            reviewed_by: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
         };
         /** TechniqueCatalogResult */
         TechniqueCatalogResult: {
@@ -881,6 +1000,134 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CapabilityRead"][];
+                };
+            };
+        };
+    };
+    get_latest_sales_briefing_api_engagements__engagement_id__sales_briefing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                engagement_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesBriefingRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_sales_briefing_api_engagements__engagement_id__sales_briefing_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                engagement_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesBriefingRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sales_briefings_api_engagements__engagement_id__sales_briefings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                engagement_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesBriefingRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_mark_reviewed_api_sales_briefings__briefing_id__mark_reviewed_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                briefing_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkReviewedRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesBriefingRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

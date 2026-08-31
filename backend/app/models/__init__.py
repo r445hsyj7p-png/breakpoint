@@ -12,6 +12,7 @@ from app.models.portfolio import (
     PortfolioTechnologyCapability,
     PortfolioTechnologyHistory,
 )
+from app.models.sales_briefing import SalesBriefing, SalesBriefingStatus
 from app.models.tactic import Tactic
 from app.models.tactic_default import (
     TacticDefaultMapping,
@@ -28,6 +29,8 @@ __all__ = [
     "PortfolioTechnology",
     "PortfolioTechnologyCapability",
     "PortfolioTechnologyHistory",
+    "SalesBriefing",
+    "SalesBriefingStatus",
     "Tactic",
     "TacticDefaultMapping",
     "TacticDefaultMappingCapability",

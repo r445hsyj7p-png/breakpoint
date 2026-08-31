@@ -10,7 +10,7 @@ from app.schemas.analyzer import (
     FindingsCreate,
     FindingsCreateResult,
 )
-from app.services.analyzer import analyze
+from app.services.analyzer import analyze_engagement
 from app.services.parsing import parse_codes
 
 router = APIRouter(prefix="/api/engagements", tags=["engagements"])
@@ -79,12 +79,4 @@ def get_engagement_analysis(engagement_id: int, db: Session = Depends(get_db)) -
     Engagements — keine materialisierte recommendation-Tabelle (bewusste
     Entscheidung, Abschnitt 10a.1)."""
     _get_engagement_or_404(db, engagement_id)
-    codes = [
-        technique_id
-        for (technique_id,) in db.query(Finding.technique_id)
-        .filter_by(engagement_id=engagement_id)
-        .distinct()
-        .order_by(Finding.technique_id)
-        .all()
-    ]
-    return analyze(db, codes)
+    return analyze_engagement(db, engagement_id)

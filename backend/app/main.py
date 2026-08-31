@@ -6,6 +6,7 @@ from app.api.capabilities import router as capabilities_router
 from app.api.engagements import router as engagements_router
 from app.api.health import router as health_router
 from app.api.portfolio import router as portfolio_router
+from app.api.sales_briefing import router as sales_briefing_router
 from app.api.techniques import router as techniques_router
 from app.core.config import settings
 
@@ -24,3 +25,4 @@ app.include_router(engagements_router)
 app.include_router(techniques_router)
 app.include_router(portfolio_router)
 app.include_router(capabilities_router)
+app.include_router(sales_briefing_router)

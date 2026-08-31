@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { AnalyzerResultView } from '../components/analyzer/AnalyzerResultView'
+import { SalesBriefingSection } from '../components/sales-briefing/SalesBriefingSection'
 import { addFindings, createEngagement, getEngagementAnalysis, listEngagements } from '../lib/api'
 import { useEngagement } from '../lib/EngagementContext'
 
@@ -137,6 +138,8 @@ export function Engagements() {
       )}
 
       {engagementId !== null && analysisQuery.data && <AnalyzerResultView result={analysisQuery.data} />}
+
+      {engagementId !== null && <SalesBriefingSection engagementId={engagementId} />}
     </div>
   )
 }
