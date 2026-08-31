@@ -1,6 +1,6 @@
 # Projektauftrag für Claude Code: Breakpoint — ATT&CK-to-Action Plattform
 
-> **v8 — ergänzt am 31.08.2026.** Schritt 5 (Sales-Briefing) umgesetzt, kritisch geprüft und Bugs behoben — Details in Abschnitt 10d.5 (DoD jetzt vollständig abgehakt inkl. Review-Ergebnis). Frühere Änderungen: ▶ **Update v7** — Abschnitt 10d konkretisierte Schritt 5 (Sales-Briefing/PydanticAI) im Vorfeld der Umsetzung: async ohne neue Infrastruktur (FastAPI `BackgroundTasks` statt Task-Queue, Grenzen dokumentiert), LLM-Anbindung als ungeklärte Annahme markiert (offene Frage 1 aus Abschnitt 12 bleibt offen), Post-Processing-Guard testbar ohne echte LLM-Anbindung dank PydanticAI `TestModel`/`FunctionModel`. ▶ **Update v6** — Abschnitt 6a.3 plant die Nutzung offizieller MITRE-Mitigations (M-Nummern) als Bootstrap für spezifische Mappings, inkl. eines konkreten Code-Funds (`resolve_technique()` schreibt `mapping_source` hartkodiert statt aus der DB zu lesen — muss vor Schritt 6 behoben werden). ▶ **Update v5** — Abschnitt 10c konkretisiert Schritt 4 (Portfolio-Modul). ▶ **Update v4** — Abschnitt 10b konkretisiert Schritt 3 (Frontend-Anbindung). ▶ **Update v3** — gezielte, enge Ausnahme von der Offline-Regel für den MITRE-Import (Abschnitt 2, 6a.2, 9). ▶ **Update v2** — aus der Review-Session vom 29.08.2026: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe Abschnitt 2a).
+> **v9 — ergänzt am 31.08.2026.** Neuer Abschnitt 10e konkretisiert Schritt 6 (MITRE-Import + Mitigations-Bootstrap) — **Planungsstand, noch nicht umgesetzt**. Basis sind echte, in dieser Session geprüfte STIX-Bundle-Daten statt Annahmen (Bundle-Größe ~54 MB, nur 44 von 268 `course-of-action`-Objekten mit gültiger M-Nummer, `kill_chain_phases`-Slugs entsprechen exakt der bestehenden `Tactic.id`-Konvention, TAXII in dieser Sandbox blockiert/GitHub-Raw erreichbar). Frühere Änderungen: ▶ **Update v8** — Schritt 5 (Sales-Briefing) umgesetzt, kritisch geprüft und Bugs behoben — Details in Abschnitt 10d.5 (DoD vollständig abgehakt inkl. Review-Ergebnis). ▶ **Update v7** — Abschnitt 10d konkretisierte Schritt 5 (Sales-Briefing/PydanticAI) im Vorfeld der Umsetzung: async ohne neue Infrastruktur (FastAPI `BackgroundTasks` statt Task-Queue, Grenzen dokumentiert), LLM-Anbindung als ungeklärte Annahme markiert (offene Frage 1 aus Abschnitt 12 bleibt offen), Post-Processing-Guard testbar ohne echte LLM-Anbindung dank PydanticAI `TestModel`/`FunctionModel`. ▶ **Update v6** — Abschnitt 6a.3 plant die Nutzung offizieller MITRE-Mitigations (M-Nummern) als Bootstrap für spezifische Mappings, inkl. eines konkreten Code-Funds (`resolve_technique()` schreibt `mapping_source` hartkodiert statt aus der DB zu lesen — muss vor Schritt 6 behoben werden). ▶ **Update v5** — Abschnitt 10c konkretisiert Schritt 4 (Portfolio-Modul). ▶ **Update v4** — Abschnitt 10b konkretisiert Schritt 3 (Frontend-Anbindung). ▶ **Update v3** — gezielte, enge Ausnahme von der Offline-Regel für den MITRE-Import (Abschnitt 2, 6a.2, 9). ▶ **Update v2** — aus der Review-Session vom 29.08.2026: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe Abschnitt 2a).
 
 Dieses Dokument ist der vollständige Übergabe-Auftrag, um das bisher als HTML-Mockup validierte Konzept **Breakpoint** ("From Attack Technique to Action") als produktive, im eigenen Datacenter betriebene Anwendung mit Claude Code umzusetzen. Es enthält Kontext, Architekturentscheidungen, Datenmodell, Modulübersicht und einen konkret ausführbaren **Schritt 1**.
 
@@ -729,13 +729,83 @@ fehlerfrei.
 
 ---
 
-## 11. Ausblick Schritt 6+ (grob, nicht Teil des aktuellen Auftrags)
+## 10e. Schritt 6 — konkreter Arbeitsauftrag *(neu, v8, Planungsstand — noch nicht umgesetzt)*
+
+**Ziel von Schritt 6:** Admin-gesteuerter MITRE-ATT&CK-Techniken-Import (Abschnitt 6a.2) mit Diff-Ansicht, Versionierung und Rollback, **plus** MITRE-Mitigations-Bootstrap für spezifische Prevent-Mappings (Abschnitt 6a.3) — beides aus demselben STIX-Bundle, ein Import-Vorgang. Dieser Abschnitt konkretisiert die in 6a.2/6a.3 bereits verabschiedeten Leitplanken zu einem ausführbaren Plan, **noch nicht implementiert** — analog zu 10a-10d wird erst bei explizitem "umsetzen" gebaut.
+
+**Kritisch vorab geklärt, mit echten Daten verifiziert statt angenommen** (das offizielle STIX-Bundle wurde probeweise geladen und ausgewertet, nicht nur die MITRE-Doku gelesen):
+
+1. ▶ **Netzwerk-Erreichbarkeit unterschiedlich, produktiv zu verifizieren.** In dieser Sandbox ist `raw.githubusercontent.com` erreichbar (das GitHub-Release-Bundle liefert `enterprise-attack.json`, HTTP 200), der öffentliche TAXII-2.1-Server (`attack-taxii.mitre.org`) dagegen von der Sandbox-Netzwerkrichtlinie blockiert (403). Das ist eine Aussage über **diese Entwicklungsumgebung**, nicht zwingend über das Produktivnetz — die Egress-Allowlist (Abschnitt 8) muss dort ohnehin explizit für den Zielhost freigeschaltet werden. Umgesetzt wird der GitHub-Raw-Pfad als primärer Weg (`https://raw.githubusercontent.com/mitre-attack/attack-stix-data/<ref>/enterprise-attack/enterprise-attack.json`), TAXII bleibt als dokumentierte, aber ungetestete Alternative; der manuelle Datei-Upload (6a.2, Punkt 1) funktioniert in jedem Fall unabhängig von der Netzwerkfreigabe.
+2. ▶ **Bundle-Größe verlangt bewusste Verarbeitung, kein naives `json.load()` im Request-Zyklus.** Das aktuelle Enterprise-ATT&CK-Bundle ist **~54 MB, 26.086 STIX-Objekte, davon 21.262 Relationships**. Fetch/Parse/Diff-Berechnung laufen deshalb wie die Sales-Briefing-Generierung (Schritt 5) als admin-getriggerter Hintergrund-Job (`BackgroundTasks`, dieselbe dokumentierte Grenze wie in Abschnitt 10d.2 — kein Verlust bei Worker-Absturz, für einen seltenen, admin-gesteuerten Vorgang akzeptabel). Das berechnete Diff-Ergebnis wird serverseitig zwischengespeichert (eigene Tabelle, s. 10e.1), damit der Admin es in Ruhe prüfen kann, ohne dass ein Reload den 54-MB-Parse-Vorgang wiederholt.
+3. ▶ **Nur 44 von 268 `course-of-action`-Objekten sind aktuelle Mitigations mit echter M-Nummer.** Der Rest sind revoked/deprecated Altobjekte (z. B. ein Objekt mit `external_id: "T1174"` statt `M-Format` — ein Datenrelikt aus einer älteren ATT&CK-Version). Der Import filtert Mitigations auf `revoked == false`, `x_mitre_deprecated != true` **und** `external_references[].external_id` passend zu `^M\d+$` (source_name `mitre-attack`) — sonst würden veraltete/nicht mehr gültige Mitigations in den Bootstrap einfließen.
+4. ▶ **`kill_chain_phases[].phase_name` entspricht exakt der `Tactic.id`-Slug-Konvention dieses Projekts, keine Mapping-Tabelle nötig.** Verifiziert: STIX liefert z. B. `resource-development`, `privilege-escalation`, `defense-evasion` — dieselben Slugs, die `scripts/seed.py::slugify()` bereits aus den Taktik-Namen erzeugt. Die Taktik-Zuordnung importierter Techniken ist damit ein direkter Dictionary-Lookup, keine Heuristik.
+5. **Sub-Technique-Erkennung bestätigt wie in Abschnitt 5 geplant.** `x_mitre_is_subtechnique: true` + eine `subtechnique-of`-Relationship (477 im Bundle) liefern die Eltern-Kind-Beziehung strukturiert — keine Prefix-Parsing-Heuristik auf der ID nötig, wie schon in Abschnitt 5/10a.3 festgelegt.
+6. **Vorbedingung aus Abschnitt 6a.3 Punkt 5 wird in Schritt 6 zuerst erledigt:** `resolve_technique()` (`backend/app/services/analyzer.py`) muss von hartkodierten `mapping_source`-Strings auf `mapping.mapping_source.value` umgestellt werden, **bevor** `mitre_derived`-Zeilen entstehen können — sonst würden sie stillschweigend als `"specific"` ausgegeben. Erster Teilschritt der Umsetzung, mit eigenem Regressionstest (bestehendes Verhalten für `specific`/`tactic_default` darf sich nicht ändern).
+7. **`mapping_source`-Enum-Erweiterung ist eine echte Migration.** Nativer Postgres-Enum-Typ `mapping_source` bekommt per Alembic `op.execute("ALTER TYPE mapping_source ADD VALUE 'mitre_derived'")` außerhalb einer Transaktion (Alembic unterstützt das über `with op.get_context().autocommit_block()`) einen dritten Wert — kein additiver Tabellen-Change, aber ein PostgreSQL-Spezifikum, das die Migration explizit dokumentieren muss.
+
+### 10e.1 Datenmodell-Ergänzung
+
+```
+technique_import_batch
+  id (PK), source ENUM('github_raw','taxii','manual_upload'),
+  source_ref (z. B. Branch/Tag oder Dateiname), bundle_version (x_mitre_attack_spec_version aus dem Bundle),
+  status ENUM('diff_pending','applied','rolled_back'),
+  triggered_by (Freitext, analog reviewed_by/changed_by aus Schritt 4/5),
+  diff_snapshot (JSONB — die berechnete Diff-Struktur, bis zur Bestätigung/Verwerfung),
+  pre_apply_snapshot (JSONB — vollständiger Vorzustand der betroffenen technique/technique_capability_mapping-Zeilen, für Rollback),
+  created_at, applied_at (nullable), rolled_back_at (nullable)
+```
+
+`technique` bekommt zwei neue Spalten: `deprecated: bool` (default `false` — Soft-Delete-Prinzip aus Abschnitt 5, keine Techniken werden hart gelöscht, damit historische Findings/Reports nicht verwaisen) und `stix_id: str | None` (die interne STIX-UUID, getrennt von der öffentlichen T-Nummer, nötig um Relationships beim nächsten Import wiederzufinden, ohne dass sich `technique.id` ändert).
+
+`MappingSource`-Enum bekommt den dritten Wert `MITRE_DERIVED = "mitre_derived"` (Migration wie oben, Punkt 7).
+
+Rollback ist **einstufig** (nur der zuletzt angewendete, noch nicht durch einen neueren Import überschriebene Batch lässt sich zurückrollen) — kein voller Versionsbaum, das wäre YAGNI für einen Vorgang, der laut Abschnitt 12 (offene Frage 6) vierteljährlich stattfindet.
+
+### 10e.2 STIX-Parsing & Diff-Berechnung (`app/services/mitre_import.py`)
+
+- Bundle-Fetch (GitHub-Raw, mit `manual_upload` als Alternative über einen Datei-Upload-Endpoint) → Parsing mit `ijson` oder blockweisem `json.load` (Entscheidung beim Bauen anhand eines Speicherverbrauchstests; 54 MB als vollständiger Python-Dict ist vermutlich noch vertretbar, muss aber gegen den Ziel-Container-Speicher geprüft werden, nicht angenommen).
+- Techniken: `attack-pattern`-Objekte mit `revoked=false`, `x_mitre_deprecated` nicht `true` → neue/geänderte/als-deprecated-erkannte Einträge relativ zum aktuellen `technique`-Bestand (Abgleich über `stix_id`, Fallback über die T-Nummer für den allerersten Import, bei dem `stix_id` noch nicht gesetzt ist).
+- Mitigations: gefilterte `course-of-action`-Objekte (10e Punkt 3) + `mitigates`-Relationships → Kandidaten für `mitre_derived`-Mappings, über den kuratierten Crosswalk `MITIGATION_CAPABILITY_CROSSWALK` (Python-Dict analog `ALL_CAPABILITIES` in `seed_data.py`, Abschnitt 6a.3 Punkt 7) auf Capabilities abgebildet. `impact`/`effort` werden vom `tactic_default_mapping` derselben Taktik übernommen (Abschnitt 6a.3 Punkt 2).
+- **Nie überschrieben werden bestehende `mapping_source='specific'`-Zeilen** (Abschnitt 6a.2 Punkt 3, 6a.3 Punkt 6) — der Diff zeigt einen Konflikt an, übernimmt ihn aber nicht automatisch.
+- Ergebnis ist eine strukturierte Diff-Antwort (neue Techniken, geänderte Namen/Taktiken, neu als deprecated erkannte Techniken, neue `mitre_derived`-Mapping-Kandidaten, übersprungene Mitigations ohne Crosswalk-Treffer, Konflikte mit bestehenden `specific`-Mappings) — nicht committet, sondern in `technique_import_batch.diff_snapshot` zwischengespeichert.
+
+### 10e.3 Endpunkte (`app/api/mitre_import.py`, Präfix `/api/admin/mitre-import`)
+
+- `POST /fetch` — stößt Fetch+Parse+Diff als Hintergrund-Job an, legt `technique_import_batch` mit `status='diff_pending'` an, `202`
+- `POST /upload` — wie `/fetch`, aber mit hochgeladener Datei statt GitHub-Raw-Fetch (`multipart/form-data`)
+- `GET /batches/{id}` — Batch-Status + Diff (sobald `diff_pending` fertig berechnet ist)
+- `POST /batches/{id}/apply` — Admin übergibt, welche Diff-Teile übernommen werden (z. B. alle Techniken, aber nur ausgewählte Mitigation-Kandidaten); schreibt `pre_apply_snapshot`, wendet an, setzt `status='applied'`
+- `POST /batches/{id}/rollback` — nur solange kein neuerer Batch `applied` ist; stellt `pre_apply_snapshot` wieder her, setzt `status='rolled_back'`
+- `GET /batches` — Historie aller Imports
+
+Kein Auth-Gate (weiterhin die aus Schritt 1 bekannte, wiederholt dokumentierte Lücke "kein Auth vor Schritt 7") — die Endpunkte sind technisch für jeden erreichbar, der das Backend erreicht, genau wie alle bisherigen.
+
+### 10e.4 Frontend
+
+Neuer Admin-Bereich (eigene Route, nicht mit dem bestehenden Portfolio-Tab vermischt, Abschnitt 6a.2 letzter Satz): Import starten → Fortschritt (Polling wie Sales-Briefing) → Diff-Ansicht mit Kategorien (neu/geändert/deprecated/Mitigation-Kandidaten/Konflikte), Checkboxen zur selektiven Übernahme → Bestätigen → Ergebnis. Eigene Unterseite "Import-Historie" mit Rollback-Button auf dem jeweils letzten Batch.
+
+### 10e.5 Definition of Done für Schritt 6
+
+- [ ] `resolve_technique()` liest `mapping_source` aus der DB-Zeile statt hartkodierter Strings (Regressionstest für bestehendes `specific`/`tactic_default`-Verhalten)
+- [ ] Migration: `technique.deprecated`/`technique.stix_id`, `technique_import_batch`-Tabelle, `mapping_source`-Enum-Erweiterung um `mitre_derived`
+- [ ] Fetch gegen ein echtes (oder als Fixture eingefrorenes) STIX-Bundle liefert einen korrekten Diff für einen bekannten Ausschnitt (z. B. eine gezielt veränderte Kopie mit einer neuen/umbenannten/deprecated Technik)
+- [ ] Bestehende `specific`-Mappings werden von einem Import nie überschrieben, Konflikt wird im Diff sichtbar
+- [ ] Mitigation-Bootstrap: gefilterte Mitigations (M-Nummer, nicht revoked/deprecated) mit Crosswalk-Treffer erzeugen `mitre_derived`-Kandidaten mit von der Taktik geerbtem impact/effort
+- [ ] `apply` ist selektiv (Admin kann Teilmengen übernehmen), schreibt `pre_apply_snapshot`
+- [ ] `rollback` stellt den Vorzustand korrekt wieder her, nur für den jeweils letzten Batch möglich
+- [ ] Frontend zeigt Diff-Ansicht + selektive Übernahme + Import-Historie mit Rollback
+- [ ] `pytest`, `npm run test`, `ruff`, `oxlint`, `tsc -b`, `npm run build` weiterhin grün
+
+---
+
+## 11. Ausblick Schritt 7+ (grob, nicht Teil des aktuellen Auftrags)
 
 - **Schritt 2:** ✅ siehe Abschnitt 10a (konkretisiert)
 - **Schritt 3:** ✅ siehe Abschnitt 10b (konkretisiert)
 - **Schritt 4:** ✅ siehe Abschnitt 10c (konkretisiert)
 - **Schritt 5:** ✅ siehe Abschnitt 10d (konkretisiert)
-- **Schritt 6:** **Admin-Bereich MITRE-Techniken-Import** mit Upload, Diff-Ansicht, Versionierung/Rollback (Abschnitt 6a.2), STIX-Relationship-basierte Sub-Technique-Zuordnung, **plus MITRE-Mitigations-Bootstrap** (Abschnitt 6a.3, eigener Teilschritt, kritisch vorab geklärte Einschränkungen)
+- **Schritt 6:** ▶ siehe Abschnitt 10e (konkretisiert, Planungsstand — Umsetzung steht noch aus)
 - **Schritt 7:** Reporting/Export, Rollenmodell/Auth-Anbindung, Audit-Log-UI
 
 ---
