@@ -5,7 +5,10 @@ from app.core.db import Base
 
 
 class Tactic(Base):
-    """Eine der 14 MITRE-ATT&CK-Enterprise-Taktiken (Reconnaissance … Impact)."""
+    """Eine MITRE-ATT&CK-Enterprise-Taktik (Reconnaissance … Impact, plus per
+    Abschnitt 10f ergänzte/umbenannte Taktiken wie Defense Impairment) —
+    Anzahl bewusst nicht hartkodiert, da Breakpoint sich immer an der
+    aktuellen MITRE-Taxonomie orientiert."""
 
     __tablename__ = "tactic"
 

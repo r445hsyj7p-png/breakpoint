@@ -38,7 +38,9 @@ def test_upload_creates_batch_and_computes_diff_synchronously_in_test_client(db_
     assert batch["bundle_version"] == "99.9"
     assert batch["triggered_by"] == "Alex"
     diff = batch["diff_snapshot"]
-    assert {"T9001", "T9001.001"} == {t["technique_id"] for t in diff["new_techniques"]}
+    assert {"T9001", "T9001.001", "T9003", "T9004"} == {
+        t["technique_id"] for t in diff["new_techniques"]
+    }
     assert any(c["technique_id"] == "T9001" for c in diff["mitigation_candidates"])
     assert any(c["technique_id"] == "T1078" for c in diff["conflicts"])
 

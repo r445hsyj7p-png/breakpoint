@@ -31,7 +31,13 @@ from app.models import (
 )
 from app.models.control import ControlCategory
 from app.models.mapping import EffortLevel, ImpactLevel, MappingSource
-from scripts.seed_data import ALL_CAPABILITIES, KB, TACTIC_DEFAULTS, TACTIC_GROUPS
+from scripts.seed_data import (
+    ALL_CAPABILITIES,
+    KB,
+    TACTIC_DEFAULTS,
+    TACTIC_GROUPS,
+    TACTIC_NAME_OVERRIDES,
+)
 
 
 def slugify(name: str) -> str:
@@ -41,12 +47,26 @@ def slugify(name: str) -> str:
 
 
 def seed_tactics(db: Session) -> dict[str, Tactic]:
+    """`tactics` bleibt über den TACTIC_GROUPS-Schlüssel (die stabile,
+    interne Bezeichnung, z. B. weiterhin "Defense Evasion") indiziert, auch
+    wenn der angezeigte `Tactic.name` per TACTIC_NAME_OVERRIDES abweicht
+    (Abschnitt 10f) — sonst müssten TACTIC_GROUPS/TACTIC_DEFAULTS bei jeder
+    MITRE-Umbenennung mitgeändert werden, obwohl sich an der Zuordnung
+    selbst nichts ändert."""
     tactics: dict[str, Tactic] = {}
     for order, name in enumerate(TACTIC_GROUPS.keys(), start=1):
+        display_name = TACTIC_NAME_OVERRIDES.get(name, name)
         tactic = db.get(Tactic, slugify(name))
         if tactic is None:
-            tactic = Tactic(id=slugify(name), name=name, mitre_order=order)
+            tactic = Tactic(id=slugify(name), name=display_name, mitre_order=order)
             db.add(tactic)
+        elif tactic.name != display_name:
+            # Idempotenter Re-Seed (läuft bei jedem Container-Start, s.
+            # docker-entrypoint.sh) synchronisiert auch den Anzeigenamen auf
+            # einer bereits existierenden Zeile — sonst würde eine bereits
+            # gesäte DB nach einer MITRE-Umbenennung auf dem alten Namen
+            # hängen bleiben.
+            tactic.name = display_name
         tactics[name] = tactic
     db.flush()
     return tactics

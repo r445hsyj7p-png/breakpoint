@@ -76,7 +76,35 @@
         {"source_name": "mitre-attack", "external_id": "T9002", "url": "https://attack.mitre.org/techniques/T9002"}
       ],
       "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "quantum-exfiltration"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--stealth-alias",
+      "name": "Synthetic Stealth-Phase Technique",
+      "revoked": false,
+      "x_mitre_deprecated": false,
+      "x_mitre_is_subtechnique": false,
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T9003", "url": "https://attack.mitre.org/techniques/T9003"}
+      ],
+      "kill_chain_phases": [
         {"kill_chain_name": "mitre-attack", "phase_name": "stealth"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--defense-impairment",
+      "name": "Synthetic Defense-Impairment Technique",
+      "revoked": false,
+      "x_mitre_deprecated": false,
+      "x_mitre_is_subtechnique": false,
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T9004", "url": "https://attack.mitre.org/techniques/T9004"}
+      ],
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "defense-impairment"}
       ]
     },
     {

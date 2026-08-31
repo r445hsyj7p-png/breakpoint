@@ -6,7 +6,7 @@ from app.models.mapping import EffortLevel, ImpactLevel
 
 
 class TacticDefaultMapping(Base):
-    """Taktik-Standardmapping: jede der 14 Taktiken bekommt eine Basis-Empfehlung,
+    """Taktik-Standardmapping: jede Taktik bekommt eine Basis-Empfehlung,
     damit jede Technik mindestens ein Mapping hat (mapping_source='tactic_default').
     Eigenständige Tabelle statt nullable technique_id — siehe docs/projektauftrag.md
     Abschnitt 5 ('tactic_default_mapping als eigene Tabelle')."""

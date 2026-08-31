@@ -246,6 +246,20 @@ TACTIC_GROUPS: dict[str, list[tuple[str, str]]] = {
         ("T1489", "Service Stop"),
         ("T1529", "System Shutdown/Reboot"),
     ],
+    # Neue 15. MITRE-Taktik (TA0112, Abschnitt 10f) — noch keine kuratierten
+    # Techniken im statischen Bootstrap-Katalog, wird durch einen echten
+    # MITRE-Import (Schritt 6) befüllt. Ans Ende angehängt (mitre_order=15),
+    # keine Verschiebung der bestehenden 14 nötig.
+    "Defense Impairment": [],
+}
+
+# Taktiken, deren MITRE-Anzeigename sich geändert hat, deren interne,
+# stabile tactic.id (aus dem TACTIC_GROUPS-Schlüssel abgeleitet) aber
+# bewusst unverändert bleibt (Abschnitt 10f) — sonst würde jede künftige
+# MITRE-Umbenennung eine FK-Kaskade über technique.tactic_id und
+# tactic_default_mapping.tactic_id auslösen.
+TACTIC_NAME_OVERRIDES: dict[str, str] = {
+    "Defense Evasion": "Stealth",  # MITRE TA0005, umbenannt
 }
 
 # Die ~10 im Prototyp detailliert ausgearbeiteten Techniken (mapping_source='specific').
@@ -345,7 +359,7 @@ KB: dict[str, dict] = {
     },
 }
 
-# Taktik-Standardmapping: jede der 14 Taktiken bekommt eine Basis-Empfehlung, damit
+# Taktik-Standardmapping: jede Taktik bekommt eine Basis-Empfehlung, damit
 # jede Technik ohne spezifisches KB-Mapping trotzdem eine Empfehlung bekommt.
 TACTIC_DEFAULTS: dict[str, dict] = {
     "Reconnaissance": {
@@ -460,6 +474,30 @@ TACTIC_DEFAULTS: dict[str, dict] = {
         "impact": "sehr_hoch",
         "effort": "hoch",
     },
+    # Neue 15. Taktik (Abschnitt 10f) — inhaltlich ein Nachfolger/Teilbereich
+    # von Defense Evasion (MITRE beschreibt Defense Impairment als "Disable
+    # or modify security tools/logs"), deshalb bewusst mit demselben Profil
+    # als Startwert übernommen; ein Admin/Entwickler kann das verfeinern,
+    # sobald ein echter MITRE-Import konkrete Techniken dorthin einordnet.
+    "Defense Impairment": {
+        "capabilities": ["EDR", "Application Control"],
+        "prevent": ["Application Control", "Integrity Monitoring"],
+        "detect": ["EDR", "File Integrity Monitoring"],
+        "respond": ["Endpoint Isolation", "Process Termination"],
+        "impact": "mittel",
+        "effort": "mittel",
+    },
+}
+
+# STIX kill_chain_phases[].phase_name -> unsere stabile tactic.id
+# (Abschnitt 10f). Für die 13 unveränderten Taktiken entspricht der
+# phase_name exakt der tactic.id (kein Alias-Eintrag nötig, Fallback in
+# app/services/mitre_import.py::_resolve_tactic_id() deckt das ab); hier nur
+# die Fälle, in denen MITRE umbenannt/erweitert hat. Von einem Entwickler zu
+# erweitern, sobald MITRE erneut eine Taktik umbenennt oder aufspaltet.
+TACTIC_PHASE_ALIASES: dict[str, str] = {
+    "stealth": "defense-evasion",  # MITRE-Umbenennung, unsere id bleibt stabil
+    "defense-impairment": "defense-impairment",  # neue Taktik, identischer Slug
 }
 
 # Masterliste aller Capabilities (ALL_CAPABILITIES aus dem Prototyp) — Quelle der

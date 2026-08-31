@@ -27,7 +27,7 @@ Das startet drei Services:
 | Service    | URL                         | Beschreibung                                   |
 |------------|------------------------------|-------------------------------------------------|
 | `db`       | `127.0.0.1:5432`             | PostgreSQL 16                                    |
-| `backend`  | http://127.0.0.1:8000        | FastAPI. Wendet beim Start automatisch alle Alembic-Migrationen an und seedet den Grunddatensatz (14 Taktiken, ~190 Techniken, Capabilities, Controls, Mappings). |
+| `backend`  | http://127.0.0.1:8000        | FastAPI. Wendet beim Start automatisch alle Alembic-Migrationen an und seedet den Grunddatensatz (15 Taktiken, ~190 Techniken, Capabilities, Controls, Mappings). |
 | `frontend` | http://127.0.0.1:5173        | Vite-Dev-Server mit Hot-Reload                   |
 
 Alle drei Services binden ausschließlich an `127.0.0.1` (nicht an alle

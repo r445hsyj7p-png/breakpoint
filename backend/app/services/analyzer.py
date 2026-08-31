@@ -70,7 +70,7 @@ def resolve_technique(db: Session, technique_id: str) -> TechniqueResult | None:
 
     default = db.get(TacticDefaultMapping, technique.tactic_id)
     if default is None:
-        # Sollte nie eintreten: jede der 14 Taktiken wird beim Seeden mit einem
+        # Sollte nie eintreten: jede Taktik wird beim Seeden mit einem
         # Standardmapping versehen (scripts/seed.py). Ein fehlender Eintrag ist
         # ein Datenintegritätsfehler, keine unbekannte Nutzereingabe — daher
         # bewusst ein harter Fehler statt stiller Einordnung als unknown_code.

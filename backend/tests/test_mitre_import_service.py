@@ -23,7 +23,7 @@ def test_parse_bundle_extracts_techniques_mitigations_and_relationships():
     bundle = parse_bundle(_load_fixture_bytes())
 
     assert bundle.bundle_version == "99.9"
-    assert len(bundle.techniques) == 5
+    assert len(bundle.techniques) == 7
     # Legacy revoked "mitigation" mit T-artiger ID darf nicht als Mitigation
     # erscheinen (Abschnitt 10e Punkt 3).
     assert len(bundle.mitigations) == 3
@@ -44,7 +44,7 @@ def test_compute_diff_against_seeded_db(db_session):
     diff = compute_diff(db_session, bundle)
 
     new_ids = {item["technique_id"] for item in diff["new_techniques"]}
-    assert new_ids == {"T9001", "T9001.001"}
+    assert new_ids == {"T9001", "T9001.001", "T9003", "T9004"}
     sub_item = next(item for item in diff["new_techniques"] if item["technique_id"] == "T9001.001")
     assert sub_item["parent_technique_id"] == "T9001"
 
@@ -55,8 +55,24 @@ def test_compute_diff_against_seeded_db(db_session):
     deprecated_ids = {item["technique_id"] for item in diff["newly_deprecated_techniques"]}
     assert deprecated_ids == {"T1003"}
 
+    # T9002 hat eine frei erfundene, nie existierende Taktik-Phase — bleibt
+    # unmappbar. T9003 ("stealth") und T9004 ("defense-impairment") lösen
+    # dagegen über TACTIC_PHASE_ALIASES korrekt auf (Abschnitt 10f).
     unmapped_ids = {item["technique_id"] for item in diff["unmapped_tactic_phase_techniques"]}
     assert unmapped_ids == {"T9002"}
+
+
+def test_compute_diff_resolves_renamed_and_new_tactic_via_alias(db_session):
+    """Abschnitt 10f: 'stealth' (MITREs Umbenennung von 'Defense Evasion')
+    löst auf unsere stabile tactic.id 'defense-evasion' auf; 'defense-
+    impairment' (neue 15. Taktik) löst auf die gleichnamige neue Taktik."""
+    run_seed()
+    bundle = parse_bundle(_load_fixture_bytes())
+    diff = compute_diff(db_session, bundle)
+
+    by_id = {item["technique_id"]: item for item in diff["new_techniques"]}
+    assert by_id["T9003"]["tactic_id"] == "defense-evasion"
+    assert by_id["T9004"]["tactic_id"] == "defense-impairment"
 
     candidate = next(c for c in diff["mitigation_candidates"] if c["technique_id"] == "T9001")
     assert candidate["capabilities"] == ["MFA"]

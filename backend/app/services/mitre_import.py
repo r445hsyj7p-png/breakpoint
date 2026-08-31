@@ -33,7 +33,7 @@ from app.models import (
 from app.models.control import ControlCategory
 from app.models.mapping import EffortLevel, ImpactLevel
 from app.models.tactic_default import TacticDefaultMapping
-from scripts.seed_data import MITIGATION_CROSSWALK
+from scripts.seed_data import MITIGATION_CROSSWALK, TACTIC_PHASE_ALIASES
 
 logger = logging.getLogger(__name__)
 
@@ -168,11 +168,20 @@ def _resolve_tactic_id(phase_names: list[str], tactic_order: dict[str, int]) -> 
     bewusst auf eine Primär-Taktik pro Technik: die früheste in der
     Kill-Chain-Reihenfolge (identische Vereinfachung wie scripts/seed.py's
     seed_techniques(), hier fortgeführt statt eines größeren n:m-Umbaus, der
-    nicht Teil des in Abschnitt 10e konkretisierten Plans ist)."""
-    candidates = [p for p in phase_names if p in tactic_order]
-    if not candidates:
+    nicht Teil des in Abschnitt 10e konkretisierten Plans ist).
+
+    Ein STIX-`phase_name` entspricht meist direkt unserer `tactic.id`
+    (Fallback `TACTIC_PHASE_ALIASES.get(p, p)`), außer MITRE hat die Taktik
+    umbenannt/aufgespalten — dafür löst TACTIC_PHASE_ALIASES (Abschnitt 10f)
+    zuerst auf unsere stabile interne tactic.id auf."""
+    candidate_tactic_ids = [
+        tactic_id
+        for p in phase_names
+        if (tactic_id := TACTIC_PHASE_ALIASES.get(p, p)) in tactic_order
+    ]
+    if not candidate_tactic_ids:
         return None
-    return min(candidates, key=lambda p: tactic_order[p])
+    return min(candidate_tactic_ids, key=lambda t: tactic_order[t])
 
 
 def compute_diff(db: Session, bundle: ParsedBundle) -> dict:
