@@ -1,6 +1,6 @@
 # Projektauftrag für Claude Code: Breakpoint — ATT&CK-to-Action Plattform
 
-> **v4 — ergänzt bei Schritt-3-Planung vom 29.08.2026.** Neuer Abschnitt 10b konkretisiert Schritt 3 (Frontend-Anbindung), inkl. zweier dabei gefundener Lücken (fehlender Techniken-Katalog-Endpunkt, fehlendes Vitest-Setup). Frühere Änderungen: ▶ **Update v3** — gezielte, enge Ausnahme von der Offline-Regel für den MITRE-Import (Abschnitt 2, 6a.2, 9). ▶ **Update v2** — aus der Review-Session vom 29.08.2026: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe Abschnitt 2a).
+> **v5 — ergänzt bei Schritt-4-Planung vom 29.08.2026.** Neuer Abschnitt 10c konkretisiert Schritt 4 (Portfolio-Modul): Datenmodell, Coverage/Gap-Berechnung, Self-Service-CRUD, und die Aktivierung des bisher immer leeren `portfolio_fit`-Felds im kanonischen Analyzer-Schema. Frühere Änderungen: ▶ **Update v4** — Abschnitt 10b konkretisiert Schritt 3 (Frontend-Anbindung). ▶ **Update v3** — gezielte, enge Ausnahme von der Offline-Regel für den MITRE-Import (Abschnitt 2, 6a.2, 9). ▶ **Update v2** — aus der Review-Session vom 29.08.2026: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe Abschnitt 2a).
 
 Dieses Dokument ist der vollständige Übergabe-Auftrag, um das bisher als HTML-Mockup validierte Konzept **Breakpoint** ("From Attack Technique to Action") als produktive, im eigenen Datacenter betriebene Anwendung mit Claude Code umzusetzen. Es enthält Kontext, Architekturentscheidungen, Datenmodell, Modulübersicht und einen konkret ausführbaren **Schritt 1**.
 
@@ -536,11 +536,68 @@ Die Topbar hat seit Schritt 1 bereits die UI für eine Engagement-Auswahl ("Kein
 
 ---
 
-## 11. Ausblick Schritt 4+ (grob, nicht Teil des aktuellen Auftrags)
+## 10c. Schritt 4 — konkreter Arbeitsauftrag *(neu, v5)*
+
+**Ziel von Schritt 4:** Das eigene Portfolio wird pflegbar und wirkt sich sichtbar auf Analyzer-Ergebnisse aus. Zwei Teile: (a) Self-Service-CRUD für `portfolio_technology` (Abschnitt 6a.1), (b) Aktivierung des bisher immer leeren `portfolio_fit`-Felds im kanonischen Analyzer-Schema (Abschnitt 10a.2) — der Auszahlungsmoment für das seit Schritt 2 vorbereitete Schema.
+
+**Bewusst weiterhin offen:** Zugriff nur für Rolle `admin` (Abschnitt 6a.1) kann noch nicht durchgesetzt werden — es gibt noch kein Auth (Schritt 7). Das Portfolio-CRUD ist in Schritt 4 wie Engagements/Analyzer für alle offen; die Rollen-Beschränkung wird in Schritt 7 nachgezogen. `portfolio_technology_history.changed_by` bleibt aus demselben Grund vorerst `NULL` (kein Nutzerkonzept vorhanden) — Feld existiert schon, damit sich das Schema in Schritt 7 nicht mehr ändern muss.
+
+### 10c.1 Datenmodell
+
+```
+portfolio_technology
+  id (PK), name, type, active (bool, default true)
+
+portfolio_technology_capability   -- Join statt Freitext (Abschnitt 6a.1: "keine
+  portfolio_technology_id (FK), capability_id (FK)   Textfelder — sonst driftet die Coverage-Matrix auseinander")
+
+portfolio_technology_history
+  id (PK), portfolio_technology_id (FK), changed_by (nullable, s.o.),
+  changed_at, field_changed, old_value, new_value
+```
+
+Kein Hard-Delete: Deaktivieren setzt `active=false` (Abschnitt 6a.1 — historische Recommendations/Reports dürfen nicht verwaisen). Jede Änderung (Anlegen, Bearbeiten, Deaktivieren) schreibt einen `portfolio_technology_history`-Eintrag pro geändertem Feld.
+
+### 10c.2 Portfolio-Fit-Integration im Analyzer
+
+`resolve_technique()` (Abschnitt 10a.3) bekommt einen zusätzlichen Schritt: für jede Capability der Technik werden aktive Portfolio-Technologien nachgeschlagen, die diese Capability abdecken (analog `matchPortfolio()`/`techsForCapability()` aus dem Prototyp) → befüllt `TechniqueResult.portfolio_fit`. **Nicht angefasst:** `_prioritize()` (Abschnitt 10a.4) — Portfolio-Fit bleibt reine Zusatzinformation ohne jeden Einfluss auf `priority_rank`, wie in Abschnitt 2 als nicht verhandelbar festgeschrieben. Ein Regressionstest sichert das explizit ab (gleiche Rangfolge mit und ohne Portfolio-Daten).
+
+### 10c.3 Coverage-Matrix & Gap-Analyse
+
+Neuer Service (`app/services/portfolio.py`): für jede Capability in der `capability`-Tabelle, welche aktiven Portfolio-Technologien sie abdecken. Gap = Capability ohne jede abdeckende Technologie. Eine Berechnung bedient sowohl den Portfolio-Tab (Matrix + Gap-Panel) als auch — indirekt über dieselbe Nachschlage-Logik — 10c.2.
+
+### 10c.4 Endpunkte (`app/api/portfolio.py`)
+
+- `GET /api/portfolio/technologies` — Liste (aktive; `?include_inactive=true` für alle)
+- `POST /api/portfolio/technologies` — anlegen (`name`, `type`, `capability_ids`)
+- `PATCH /api/portfolio/technologies/{id}` — bearbeiten, schreibt History pro geändertem Feld
+- `POST /api/portfolio/technologies/{id}/deactivate` — `active=false`, History-Eintrag
+- `GET /api/portfolio/technologies/{id}/history` — Änderungshistorie
+- `GET /api/portfolio/coverage` — Coverage-Matrix + Gap-Liste
+
+Kein eigener "Vorschau"-Endpunkt: die im Prototyp geforderte "sofortige Vorschau" (Abschnitt 6a.1) entsteht einfacher dadurch, dass das Frontend nach jeder Mutation die Coverage-Query invalidiert (gleiches Muster wie Findings→Analyse in Schritt 3) — eine Berechnung, kein Sonderfall.
+
+### 10c.5 Frontend
+
+Portfolio-Tab (bisher `PagePlaceholder`): Technologie-Karten, Anlegen/Bearbeiten-Formular mit **Capability-Mehrfachauswahl** (Checkboxen gegen `GET /api/techniques`-Capability-Liste — nicht Freitext), Deaktivieren-Button, Coverage-Matrix-Tabelle, Gap-Panel, Verlauf pro Technologie. `TechniqueCard` (Schritt 3) zeigt `portfolio_fit` jetzt als eigene Chip-Zeile statt eines leeren Arrays.
+
+### 10c.6 Definition of Done für Schritt 4
+
+- [ ] Migration für die drei neuen Tabellen läuft durch
+- [ ] Portfolio-Technologie anlegen → Capability zuordnen → erscheint sofort in Coverage-Matrix und ggf. verschwindet aus der Gap-Liste
+- [ ] Deaktivieren ist Soft-Delete (Zeile bleibt in der DB, `active=false`)
+- [ ] Jede Änderung erzeugt einen History-Eintrag
+- [ ] `POST /api/analyze` liefert für Techniken mit Portfolio-Abdeckung nicht-leere `portfolio_fit`-Listen
+- [ ] Regressionstest: `priority_rank`-Reihenfolge identisch mit und ohne Portfolio-Daten
+- [ ] `pytest`, `npm run test`, `ruff`, `oxlint`, `tsc -b`, `npm run build` weiterhin grün
+
+---
+
+## 11. Ausblick Schritt 5+ (grob, nicht Teil des aktuellen Auftrags)
 
 - **Schritt 2:** ✅ siehe Abschnitt 10a (konkretisiert)
 - **Schritt 3:** ✅ siehe Abschnitt 10b (konkretisiert)
-- **Schritt 4:** Portfolio-Modul inkl. Coverage-Matrix, Gap-Analyse, **Admin-Bereich mit Self-Service-CRUD** (Abschnitt 6a.1)
+- **Schritt 4:** ✅ siehe Abschnitt 10c (konkretisiert)
 - **Schritt 5:** PydanticAI-Sales-Briefing-Modul gegen interne LLM-Plattform (siehe Abschnitt 7), inkl. Post-Processing-Guard und asynchroner Verarbeitung
 - **Schritt 6:** **Admin-Bereich MITRE-Techniken-Import** mit Upload, Diff-Ansicht, Versionierung/Rollback (Abschnitt 6a.2), STIX-Relationship-basierte Sub-Technique-Zuordnung
 - **Schritt 7:** Reporting/Export, Rollenmodell/Auth-Anbindung, Audit-Log-UI
