@@ -8,6 +8,11 @@ export type EngagementRead = components['schemas']['EngagementRead']
 export type FindingsCreateResult = components['schemas']['FindingsCreateResult']
 export type TechniqueCatalogResult = components['schemas']['TechniqueCatalogResult']
 export type TechniqueSummary = components['schemas']['TechniqueSummary']
+export type PortfolioTechnologyRead = components['schemas']['PortfolioTechnologyRead']
+export type PortfolioTechnologyHistoryEntry = components['schemas']['PortfolioTechnologyHistoryEntry']
+export type CoverageResult = components['schemas']['CoverageResult']
+export type CoverageRow = components['schemas']['CoverageRow']
+export type CapabilityRead = components['schemas']['CapabilityRead']
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 
@@ -68,4 +73,39 @@ export function listTechniques(params?: {
   if (params?.q) search.set('q', params.q)
   const qs = search.toString()
   return request(`/api/techniques${qs ? `?${qs}` : ''}`)
+}
+
+export function listPortfolioTechnologies(includeInactive = false): Promise<PortfolioTechnologyRead[]> {
+  return request(`/api/portfolio/technologies${includeInactive ? '?include_inactive=true' : ''}`)
+}
+
+export function createPortfolioTechnology(payload: {
+  name: string
+  type: string
+  capability_ids: number[]
+}): Promise<PortfolioTechnologyRead> {
+  return request('/api/portfolio/technologies', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+export function updatePortfolioTechnology(
+  id: number,
+  payload: { name?: string; type?: string; capability_ids?: number[] },
+): Promise<PortfolioTechnologyRead> {
+  return request(`/api/portfolio/technologies/${id}`, { method: 'PATCH', body: JSON.stringify(payload) })
+}
+
+export function deactivatePortfolioTechnology(id: number): Promise<PortfolioTechnologyRead> {
+  return request(`/api/portfolio/technologies/${id}/deactivate`, { method: 'POST' })
+}
+
+export function getPortfolioTechnologyHistory(id: number): Promise<PortfolioTechnologyHistoryEntry[]> {
+  return request(`/api/portfolio/technologies/${id}/history`)
+}
+
+export function getPortfolioCoverage(): Promise<CoverageResult> {
+  return request('/api/portfolio/coverage')
+}
+
+export function listCapabilities(): Promise<CapabilityRead[]> {
+  return request('/api/capabilities')
 }

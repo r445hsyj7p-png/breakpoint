@@ -1,6 +1,18 @@
-from app.models import Technique
+from app.models import Capability, PortfolioTechnology, PortfolioTechnologyCapability, Technique
 from app.services.analyzer import analyze, resolve_technique
 from scripts.seed import run as run_seed
+
+
+def _add_portfolio_technology(db, name: str, capability_names: list[str]) -> None:
+    technology = PortfolioTechnology(name=name, type="Test", active=True)
+    db.add(technology)
+    db.flush()
+    for cap_name in capability_names:
+        capability_id = db.query(Capability.id).filter_by(name=cap_name).scalar()
+        db.add(
+            PortfolioTechnologyCapability(portfolio_technology_id=technology.id, capability_id=capability_id)
+        )
+    db.commit()
 
 
 def test_specific_mapping_resolves_directly(db_session):
@@ -86,3 +98,38 @@ def test_prioritization_ranking_is_independent_of_input_order(db_session):
     forward_ranked_labels = [m.label for m in forward.prioritized_measures]
     backward_ranked_labels = [m.label for m in backward.prioritized_measures]
     assert forward_ranked_labels == backward_ranked_labels
+
+
+def test_portfolio_fit_is_empty_without_portfolio_data(db_session):
+    run_seed()
+    result = resolve_technique(db_session, "T1078")
+    assert result.portfolio_fit == []
+
+
+def test_portfolio_fit_lists_covering_technologies(db_session):
+    """docs/projektauftrag.md Abschnitt 10c.2: portfolio_fit wird aus aktiven
+    Portfolio-Technologien befüllt, die eine der Technik-Capabilities abdecken."""
+    run_seed()
+    _add_portfolio_technology(db_session, "Okta", ["MFA", "Conditional Access"])
+    _add_portfolio_technology(db_session, "Cortex XDR", ["EDR"])
+
+    result = resolve_technique(db_session, "T1078")  # capabilities: MFA, Conditional Access, PAM, Identity Monitoring
+    assert result.portfolio_fit == ["Okta"]
+
+    unrelated = resolve_technique(db_session, "T1055")  # capabilities: EDR, Application Control
+    assert unrelated.portfolio_fit == ["Cortex XDR"]
+
+
+def test_portfolio_fit_never_influences_priority_rank(db_session):
+    """Nicht-verhandelbares Prinzip aus Abschnitt 2: Portfolio-Fit ist reine
+    Zusatzinformation und darf priority_rank nie beeinflussen."""
+    run_seed()
+    without_portfolio = analyze(db_session, ["T1078", "T1078.004", "T1003"])
+    ranking_without = [(m.label, m.priority_rank) for m in without_portfolio.prioritized_measures]
+
+    _add_portfolio_technology(db_session, "Okta", ["MFA"])
+
+    with_portfolio = analyze(db_session, ["T1078", "T1078.004", "T1003"])
+    ranking_with = [(m.label, m.priority_rank) for m in with_portfolio.prioritized_measures]
+
+    assert ranking_without == ranking_with

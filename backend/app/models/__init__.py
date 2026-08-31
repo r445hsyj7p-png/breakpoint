@@ -7,6 +7,11 @@ from app.models.mapping import (
     TechniqueCapabilityMappingCapability,
     TechniqueCapabilityMappingControl,
 )
+from app.models.portfolio import (
+    PortfolioTechnology,
+    PortfolioTechnologyCapability,
+    PortfolioTechnologyHistory,
+)
 from app.models.tactic import Tactic
 from app.models.tactic_default import (
     TacticDefaultMapping,
@@ -20,6 +25,9 @@ __all__ = [
     "Control",
     "Engagement",
     "Finding",
+    "PortfolioTechnology",
+    "PortfolioTechnologyCapability",
+    "PortfolioTechnologyHistory",
     "Tactic",
     "TacticDefaultMapping",
     "TacticDefaultMappingCapability",

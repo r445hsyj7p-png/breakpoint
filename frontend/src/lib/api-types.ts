@@ -129,6 +129,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portfolio/technologies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Technologies */
+        get: operations["get_technologies_api_portfolio_technologies_get"];
+        put?: never;
+        /** Post Technology */
+        post: operations["post_technology_api_portfolio_technologies_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/technologies/{technology_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Technology */
+        patch: operations["patch_technology_api_portfolio_technologies__technology_id__patch"];
+        trace?: never;
+    };
+    "/api/portfolio/technologies/{technology_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Deactivate Technology */
+        post: operations["post_deactivate_technology_api_portfolio_technologies__technology_id__deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/technologies/{technology_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Technology History */
+        get: operations["get_technology_history_api_portfolio_technologies__technology_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Coverage */
+        get: operations["get_coverage_api_portfolio_coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Capabilities
+         * @description Referenzliste aller Capabilities mit ID — nötig für die Capability-
+         *     Mehrfachauswahl im Portfolio-Formular (docs/projektauftrag.md Abschnitt
+         *     10c.5), da die Coverage-Antwort nur Namen liefert, keine IDs.
+         */
+        get: operations["get_capabilities_api_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -149,6 +257,13 @@ export interface components {
             /** Prioritized Measures */
             prioritized_measures: components["schemas"]["PrioritizedMeasure"][];
         };
+        /** CapabilityRead */
+        CapabilityRead: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
         /** ControlRef */
         ControlRef: {
             /** Id */
@@ -160,6 +275,20 @@ export interface components {
             category: "prevent" | "detect" | "respond";
             /** Label */
             label: string;
+        };
+        /** CoverageResult */
+        CoverageResult: {
+            /** Rows */
+            rows: components["schemas"]["CoverageRow"][];
+            /** Gaps */
+            gaps: string[];
+        };
+        /** CoverageRow */
+        CoverageRow: {
+            /** Capability */
+            capability: string;
+            /** Covering Technologies */
+            covering_technologies: string[];
         };
         /** EngagementCreate */
         EngagementCreate: {
@@ -195,6 +324,62 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** PortfolioTechnologyCreate */
+        PortfolioTechnologyCreate: {
+            /** Name */
+            name: string;
+            /** Type */
+            type: string;
+            /**
+             * Capability Ids
+             * @default []
+             */
+            capability_ids: number[];
+        };
+        /** PortfolioTechnologyHistoryEntry */
+        PortfolioTechnologyHistoryEntry: {
+            /** Id */
+            id: number;
+            /** Changed By */
+            changed_by: string | null;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** Field Changed */
+            field_changed: string;
+            /** Old Value */
+            old_value: string | null;
+            /** New Value */
+            new_value: string | null;
+        };
+        /** PortfolioTechnologyRead */
+        PortfolioTechnologyRead: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Type */
+            type: string;
+            /** Active */
+            active: boolean;
+            /** Capabilities */
+            capabilities: string[];
+        };
+        /**
+         * PortfolioTechnologyUpdate
+         * @description Alle Felder optional (PATCH-Semantik) — nur mitgeschickte Felder werden
+         *     geändert und lösen jeweils einen eigenen History-Eintrag aus.
+         */
+        PortfolioTechnologyUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Type */
+            type?: string | null;
+            /** Capability Ids */
+            capability_ids?: number[] | null;
         };
         /** PrioritizedMeasure */
         PrioritizedMeasure: {
@@ -495,6 +680,207 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_technologies_api_portfolio_technologies_get: {
+        parameters: {
+            query?: {
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioTechnologyRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_technology_api_portfolio_technologies_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioTechnologyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioTechnologyRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_technology_api_portfolio_technologies__technology_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                technology_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioTechnologyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioTechnologyRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_deactivate_technology_api_portfolio_technologies__technology_id__deactivate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                technology_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioTechnologyRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_technology_history_api_portfolio_technologies__technology_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                technology_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioTechnologyHistoryEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_coverage_api_portfolio_coverage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageResult"];
+                };
+            };
+        };
+    };
+    get_capabilities_api_capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CapabilityRead"][];
                 };
             };
         };

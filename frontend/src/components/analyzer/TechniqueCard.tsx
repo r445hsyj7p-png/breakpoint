@@ -42,6 +42,22 @@ export function TechniqueCard({ technique }: { technique: TechniqueResult }) {
         ))}
       </div>
 
+      <div className="text-[11px] font-semibold tracking-wide text-ink-600 uppercase">Portfolio-Fit</div>
+      <div className="flex flex-wrap gap-1.5">
+        {technique.portfolio_fit.length > 0 ? (
+          technique.portfolio_fit.map((name) => (
+            <span
+              key={name}
+              className="rounded-md border border-portfolio/35 bg-portfolio-dim px-2 py-0.5 text-[11px] font-semibold text-portfolio"
+            >
+              {name}
+            </span>
+          ))
+        ) : (
+          <span className="text-[11px] text-ink-600">Kein Portfolio-Fit</span>
+        )}
+      </div>
+
       <ul className="flex flex-col gap-1.5 text-[12.5px] text-ink-300">
         {(['prevent', 'detect', 'respond'] as const).map((category) =>
           byCategory[category].length ? (

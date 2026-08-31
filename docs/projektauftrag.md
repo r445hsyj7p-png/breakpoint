@@ -574,22 +574,29 @@ Neuer Service (`app/services/portfolio.py`): für jede Capability in der `capabi
 - `POST /api/portfolio/technologies/{id}/deactivate` — `active=false`, History-Eintrag
 - `GET /api/portfolio/technologies/{id}/history` — Änderungshistorie
 - `GET /api/portfolio/coverage` — Coverage-Matrix + Gap-Liste
+- ▶ `GET /api/capabilities` *(ergänzt beim Bauen)* — ID-tragende Referenzliste aller Capabilities, nötig für die Mehrfachauswahl im Formular (die Coverage-Antwort liefert nur Namen, keine IDs)
 
 Kein eigener "Vorschau"-Endpunkt: die im Prototyp geforderte "sofortige Vorschau" (Abschnitt 6a.1) entsteht einfacher dadurch, dass das Frontend nach jeder Mutation die Coverage-Query invalidiert (gleiches Muster wie Findings→Analyse in Schritt 3) — eine Berechnung, kein Sonderfall.
 
 ### 10c.5 Frontend
 
-Portfolio-Tab (bisher `PagePlaceholder`): Technologie-Karten, Anlegen/Bearbeiten-Formular mit **Capability-Mehrfachauswahl** (Checkboxen gegen `GET /api/techniques`-Capability-Liste — nicht Freitext), Deaktivieren-Button, Coverage-Matrix-Tabelle, Gap-Panel, Verlauf pro Technologie. `TechniqueCard` (Schritt 3) zeigt `portfolio_fit` jetzt als eigene Chip-Zeile statt eines leeren Arrays.
+Portfolio-Tab (bisher `PagePlaceholder`): Technologie-Karten, Anlegen/Bearbeiten-Formular mit **Capability-Mehrfachauswahl** (Checkboxen gegen `GET /api/capabilities` — nicht Freitext), Deaktivieren-Button, Coverage-Matrix-Tabelle, Gap-Panel, Verlauf pro Technologie. `TechniqueCard` (Schritt 3) zeigt `portfolio_fit` jetzt als eigene Chip-Zeile statt eines leeren Arrays.
 
 ### 10c.6 Definition of Done für Schritt 4
 
-- [ ] Migration für die drei neuen Tabellen läuft durch
-- [ ] Portfolio-Technologie anlegen → Capability zuordnen → erscheint sofort in Coverage-Matrix und ggf. verschwindet aus der Gap-Liste
-- [ ] Deaktivieren ist Soft-Delete (Zeile bleibt in der DB, `active=false`)
-- [ ] Jede Änderung erzeugt einen History-Eintrag
-- [ ] `POST /api/analyze` liefert für Techniken mit Portfolio-Abdeckung nicht-leere `portfolio_fit`-Listen
-- [ ] Regressionstest: `priority_rank`-Reihenfolge identisch mit und ohne Portfolio-Daten
-- [ ] `pytest`, `npm run test`, `ruff`, `oxlint`, `tsc -b`, `npm run build` weiterhin grün
+- [x] Migration für die drei neuen Tabellen läuft durch
+- [x] Portfolio-Technologie anlegen → Capability zuordnen → erscheint sofort in Coverage-Matrix und verschwindet aus der Gap-Liste (im Browser verifiziert: MFA verschwand nach Anlegen von "Okta" mit Capability MFA)
+- [x] Deaktivieren ist Soft-Delete (Zeile bleibt in der DB, `active=false`, verschwindet aus Coverage/Gap-Berechnung)
+- [x] Jede Änderung erzeugt einen History-Eintrag, No-Op-Updates erzeugen keinen
+- [x] `POST /api/analyze` liefert für Techniken mit Portfolio-Abdeckung nicht-leere `portfolio_fit`-Listen
+- [x] Regressionstest: `priority_rank`-Reihenfolge identisch mit und ohne Portfolio-Daten
+- [x] `pytest` (47 Tests), `npm run test` (8 Tests), `ruff`, `oxlint`, `tsc -b`, `npm run build` grün
+
+**Ergebnis der kritischen Review-Runde nach Implementierung** *(neu, v5)*: Zwei zusätzliche Backend-Endpunkte gegenüber dem ursprünglichen Plan als Lücke gefunden und ergänzt: `GET /api/engagements` gab es schon (Schritt 3), aber **`GET /api/capabilities`** fehlte — ohne ID-tragende Referenzliste konnte das Formular keine Capability-Mehrfachauswahl an `capability_ids` binden (Coverage-Antworten liefern nur Namen). Zwei echte Bugs gefunden und behoben:
+- **`create_technology` deduplizierte `capability_ids` nicht** (im Unterschied zu `update_technology`) — doppelte IDs im Payload hätten beim Commit einen `IntegrityError` auf dem zusammengesetzten Primärschlüssel ausgelöst. Fix: `sorted(set(...))` konsistent an beiden Stellen.
+- **Keine Validierung nicht existierender `capability_id`s** — hätte einen rohen 500er (FK-Verletzung) statt einer sauberen Antwort erzeugt. Fix: `_validate_capability_ids_exist()` in der API-Schicht, liefert `422` mit den unbekannten IDs.
+
+Fehlende Fehleranzeige bei fehlgeschlagenem Bearbeiten/Deaktivieren im Frontend ergänzt (gleiches Muster wie Schritt 3). Ein scheinbarer Layout-Bug (Topbar erschien mitten im bearbeiteten Formular) stellte sich als reines Playwright-`fullPage`-Screenshot-Artefakt bei `position: sticky` heraus, kein echter Fehler — mit einem normalen Viewport-Screenshot verifiziert. Veralteten Sidebar-Hinweistext aktualisiert.
 
 ---
 

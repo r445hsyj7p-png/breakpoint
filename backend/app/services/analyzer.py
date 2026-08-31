@@ -12,6 +12,7 @@ from app.schemas.analyzer import (
     PrioritizedMeasure,
     TechniqueResult,
 )
+from app.services.portfolio import portfolio_fit_for_capabilities
 
 IMPACT_RANK = {"niedrig": 1, "mittel": 2, "hoch": 3, "sehr_hoch": 4}
 EFFORT_RANK = {"niedrig": 1, "mittel": 2, "hoch": 3}
@@ -64,6 +65,7 @@ def resolve_technique(db: Session, technique_id: str) -> TechniqueResult | None:
             effort=mapping.effort.value,
             capabilities=capabilities,
             controls=controls,
+            portfolio_fit=portfolio_fit_for_capabilities(db, capabilities),
         )
 
     default = db.get(TacticDefaultMapping, technique.tactic_id)
@@ -92,6 +94,7 @@ def resolve_technique(db: Session, technique_id: str) -> TechniqueResult | None:
         effort=default.effort.value,
         capabilities=capabilities,
         controls=controls,
+        portfolio_fit=portfolio_fit_for_capabilities(db, capabilities),
     )
 
 
