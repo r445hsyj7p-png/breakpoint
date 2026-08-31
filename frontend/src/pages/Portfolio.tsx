@@ -18,8 +18,12 @@ export function Portfolio() {
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState('')
   const [newCapabilityIds, setNewCapabilityIds] = useState<Set<number>>(new Set())
+  const [includeInactive, setIncludeInactive] = useState(false)
 
-  const technologiesQuery = useQuery({ queryKey: ['portfolio-technologies'], queryFn: () => listPortfolioTechnologies() })
+  const technologiesQuery = useQuery({
+    queryKey: ['portfolio-technologies', includeInactive],
+    queryFn: () => listPortfolioTechnologies(includeInactive),
+  })
   const capabilitiesQuery = useQuery({ queryKey: ['capabilities'], queryFn: listCapabilities })
   const coverageQuery = useQuery({ queryKey: ['portfolio-coverage'], queryFn: getPortfolioCoverage })
 
@@ -107,7 +111,17 @@ export function Portfolio() {
       </div>
 
       <div className="rounded-lg border border-line bg-graphite-900 p-6">
-        <div className="mb-1 text-[15px] font-semibold">Portfolio-Technologien</div>
+        <div className="mb-1 flex items-center justify-between">
+          <div className="text-[15px] font-semibold">Portfolio-Technologien</div>
+          <label className="flex items-center gap-1.5 text-[11.5px] text-ink-400">
+            <input
+              type="checkbox"
+              checked={includeInactive}
+              onChange={(e) => setIncludeInactive(e.target.checked)}
+            />
+            Inaktive anzeigen
+          </label>
+        </div>
         <div className="mb-4 text-xs text-ink-400">
           {technologiesQuery.data?.length ?? 0} Technologien / Services, zugeordnet zu Security Capabilities
         </div>

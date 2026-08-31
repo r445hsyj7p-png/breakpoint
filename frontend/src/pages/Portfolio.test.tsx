@@ -74,4 +74,41 @@ describe('Portfolio', () => {
     expect(gapPanel).toHaveTextContent('EDR')
     expect(gapPanel).not.toHaveTextContent('MFA')
   })
+
+  it('zeigt deaktivierte Technologien erst nach "Inaktive anzeigen" (Regressionstest Schritt 6)', async () => {
+    server.use(
+      http.get('http://127.0.0.1:8000/api/portfolio/technologies', ({ request }) => {
+        const includeInactive = new URL(request.url).searchParams.get('include_inactive') === 'true'
+        const technologies = includeInactive
+          ? [{ id: 1, name: 'Okta', type: 'Identity', active: false, capabilities: ['MFA'] }]
+          : []
+        return HttpResponse.json(technologies)
+      }),
+      http.get('http://127.0.0.1:8000/api/capabilities', () => HttpResponse.json(CAPABILITIES)),
+      http.get('http://127.0.0.1:8000/api/portfolio/coverage', () =>
+        HttpResponse.json({
+          rows: [
+            { capability: 'MFA', covering_technologies: [] },
+            { capability: 'EDR', covering_technologies: [] },
+          ],
+          gaps: ['MFA', 'EDR'],
+        }),
+      ),
+    )
+
+    renderWithProviders(<Portfolio />)
+    const user = userEvent.setup()
+
+    await waitFor(() => expect(screen.getByText('Noch keine Portfolio-Technologien angelegt.')).toBeInTheDocument())
+
+    await user.click(screen.getByRole('checkbox', { name: 'Inaktive anzeigen' }))
+
+    // "Okta" erscheint sowohl auf der TechnologyCard als auch als
+    // Spaltenkopf der Coverage-Matrix — deshalb getAllByText statt
+    // getByText (das bei mehreren Treffern wirft).
+    await waitFor(() => expect(screen.getAllByText('Okta').length).toBeGreaterThan(0))
+    expect(screen.getByText('Inaktiv')).toBeInTheDocument()
+    // Ein bereits deaktivierter Eintrag darf keinen erneuten "Deaktivieren"-Link mehr zeigen.
+    expect(screen.queryByText('Deaktivieren')).not.toBeInTheDocument()
+  })
 })

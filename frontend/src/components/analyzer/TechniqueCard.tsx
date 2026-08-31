@@ -1,6 +1,20 @@
 import type { TechniqueResult } from '../../lib/api'
 import { CATEGORY_CLASS, CATEGORY_LABEL, EFFORT_CLASS, EFFORT_LABEL, IMPACT_CLASS, IMPACT_LABEL } from './pillStyles'
 
+const MAPPING_SOURCE_BADGE_CLASS: Record<TechniqueResult['mapping_source'], string> = {
+  specific: 'bg-prevent-dim text-prevent',
+  mitre_derived: 'bg-portfolio-dim text-portfolio',
+  tactic_default: 'bg-detect-dim text-detect',
+}
+
+function mappingSourceLabel(technique: TechniqueResult): string {
+  if (technique.mapping_source === 'tactic_default') return 'Taktik-Standard'
+  const base = technique.mapping_source === 'specific' ? 'Spezifisches Mapping' : 'MITRE-Mitigation'
+  return technique.resolved_via_technique_id === technique.technique_id
+    ? base
+    : `${base} (via ${technique.resolved_via_technique_id})`
+}
+
 export function TechniqueCard({ technique }: { technique: TechniqueResult }) {
   const byCategory = {
     prevent: technique.controls.filter((c) => c.category === 'prevent'),
@@ -22,15 +36,9 @@ export function TechniqueCard({ technique }: { technique: TechniqueResult }) {
       </div>
 
       <span
-        className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-          technique.mapping_source === 'specific' ? 'bg-prevent-dim text-prevent' : 'bg-detect-dim text-detect'
-        }`}
+        className={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${MAPPING_SOURCE_BADGE_CLASS[technique.mapping_source]}`}
       >
-        {technique.mapping_source === 'specific'
-          ? technique.resolved_via_technique_id === technique.technique_id
-            ? 'Spezifisches Mapping'
-            : `Spezifisch (via ${technique.resolved_via_technique_id})`
-          : 'Taktik-Standard'}
+        {mappingSourceLabel(technique)}
       </span>
 
       <div className="text-[11px] font-semibold tracking-wide text-ink-600 uppercase">Capabilities</div>

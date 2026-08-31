@@ -151,6 +151,7 @@ export function MitreImport() {
           {batch?.status === 'diff_ready' && batch.diff_snapshot && (
             <>
               <ImportDiffView
+                key={batch.id}
                 diff={batch.diff_snapshot}
                 onApply={(selection) => applyMutation.mutate(selection)}
                 isApplying={applyMutation.isPending}

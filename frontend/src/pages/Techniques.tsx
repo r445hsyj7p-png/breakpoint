@@ -20,10 +20,17 @@ export function Techniques() {
   const [tactic, setTactic] = useState('')
   const [status, setStatus] = useState('')
   const [q, setQ] = useState('')
+  const [includeDeprecated, setIncludeDeprecated] = useState(false)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['techniques', tactic, status, q],
-    queryFn: () => listTechniques({ tactic: tactic || undefined, status: status || undefined, q: q || undefined }),
+    queryKey: ['techniques', tactic, status, q, includeDeprecated],
+    queryFn: () =>
+      listTechniques({
+        tactic: tactic || undefined,
+        status: status || undefined,
+        q: q || undefined,
+        includeDeprecated,
+      }),
   })
 
   return (
@@ -64,6 +71,14 @@ export function Techniques() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        <label className="flex items-center gap-1.5 text-[12px] text-ink-400">
+          <input
+            type="checkbox"
+            checked={includeDeprecated}
+            onChange={(e) => setIncludeDeprecated(e.target.checked)}
+          />
+          Deprecated anzeigen
+        </label>
         <span className="ml-auto text-[12px] text-ink-400">
           {isLoading ? 'Lade …' : `${data?.total ?? 0} Zeilen`}
         </span>
@@ -89,6 +104,11 @@ export function Techniques() {
                   <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[t.mapping_source]}`}>
                     {STATUS_LABEL[t.mapping_source]}
                   </span>
+                  {t.deprecated && (
+                    <span className="ml-1.5 rounded-full bg-graphite-800 px-2.5 py-0.5 text-[11px] font-semibold text-ink-500">
+                      Deprecated
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}

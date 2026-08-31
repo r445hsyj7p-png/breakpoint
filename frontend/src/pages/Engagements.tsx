@@ -24,9 +24,16 @@ export function Engagements() {
   })
 
   const findingsMutation = useMutation({
-    mutationFn: (codes: string) => addFindings(engagementId!, codes),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['engagement-analysis', engagementId] })
+    mutationFn: ({ engagementId: targetId, codes }: { engagementId: number; codes: string }) =>
+      addFindings(targetId, codes),
+    // Verwendet die Engagement-ID aus den Mutation-Variablen, nicht aus dem
+    // äußeren Closure-Scope: TanStack Query bindet onSuccess bei jedem
+    // Render neu, sonst würde ein Engagement-Wechsel während der laufenden
+    // Anfrage die Analyse des FALSCHEN (neu ausgewählten) Engagements
+    // invalidieren statt der des Engagements, für das die Findings
+    // tatsächlich hinzugefügt wurden.
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['engagement-analysis', variables.engagementId] })
       setFindingsInput('')
     },
   })
@@ -107,7 +114,9 @@ export function Engagements() {
             className="flex flex-wrap items-start gap-3"
             onSubmit={(e) => {
               e.preventDefault()
-              if (findingsInput.trim()) findingsMutation.mutate(findingsInput)
+              if (findingsInput.trim()) {
+                findingsMutation.mutate({ engagementId: engagementId!, codes: findingsInput })
+              }
             }}
           >
             <input

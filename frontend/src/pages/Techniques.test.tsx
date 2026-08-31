@@ -1,4 +1,5 @@
 import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
@@ -62,6 +63,36 @@ describe('Techniques', () => {
     renderWithProviders(<Techniques />)
 
     await waitFor(() => expect(screen.getByText('MITRE-Mitigation')).toBeInTheDocument())
+  })
+
+  it('zeigt deprecated Techniken erst nach "Deprecated anzeigen" (Regressionstest Schritt 6)', async () => {
+    server.use(
+      http.get('http://127.0.0.1:8000/api/techniques', ({ request }) => {
+        const includeDeprecated = new URL(request.url).searchParams.get('include_deprecated') === 'true'
+        const techniques = includeDeprecated
+          ? [
+              {
+                technique_id: 'T1003',
+                technique_name: 'OS Credential Dumping',
+                tactic_name: 'Credential Access',
+                mapping_source: 'tactic_default',
+                deprecated: true,
+              },
+            ]
+          : []
+        return HttpResponse.json({ techniques, total: techniques.length })
+      }),
+    )
+
+    renderWithProviders(<Techniques />)
+    const user = userEvent.setup()
+
+    await waitFor(() => expect(screen.getByText('Keine Techniken gefunden.')).toBeInTheDocument())
+
+    await user.click(screen.getByRole('checkbox', { name: 'Deprecated anzeigen' }))
+
+    await waitFor(() => expect(screen.getByText('OS Credential Dumping')).toBeInTheDocument())
+    expect(screen.getByText('Deprecated')).toBeInTheDocument()
   })
 
   it('zeigt einen Hinweis, wenn kein Ergebnis zur Filterkombination passt', async () => {

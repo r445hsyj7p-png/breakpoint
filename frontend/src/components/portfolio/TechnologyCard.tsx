@@ -79,7 +79,14 @@ export function TechnologyCard({
         <>
           <div className="flex items-start justify-between gap-2.5">
             <div>
-              <div className="text-[13.5px] font-semibold">{technology.name}</div>
+              <div className="flex items-center gap-1.5">
+                <div className="text-[13.5px] font-semibold">{technology.name}</div>
+                {!technology.active && (
+                  <span className="rounded-md bg-graphite-800 px-1.5 py-0.5 text-[10px] font-semibold text-ink-500">
+                    Inaktiv
+                  </span>
+                )}
+              </div>
               <div className="mt-0.5 text-[11px] font-semibold text-portfolio">{technology.type}</div>
             </div>
             <div className="flex h-8 w-8 flex-none items-center justify-center rounded-md bg-portfolio-dim text-portfolio">
@@ -100,13 +107,15 @@ export function TechnologyCard({
             <button className="font-semibold text-amber hover:text-[#f0b355]" onClick={startEditing}>
               Bearbeiten
             </button>
-            <button
-              className="font-semibold text-ember hover:opacity-80 disabled:opacity-50"
-              onClick={() => onDeactivate(technology.id)}
-              disabled={isUpdating}
-            >
-              Deaktivieren
-            </button>
+            {technology.active && (
+              <button
+                className="font-semibold text-ember hover:opacity-80 disabled:opacity-50"
+                onClick={() => onDeactivate(technology.id)}
+                disabled={isUpdating}
+              >
+                Deaktivieren
+              </button>
+            )}
             <button
               className="font-semibold text-ink-400 hover:text-ink-100"
               onClick={() => setShowHistory((v) => !v)}

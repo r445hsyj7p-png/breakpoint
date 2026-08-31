@@ -56,6 +56,27 @@ describe('Analyzer', () => {
     expect(screen.getByText('Priorisierte Maßnahmen')).toBeInTheDocument()
   })
 
+  it('zeigt mitre_derived-Techniken mit eigenem Badge statt "Taktik-Standard" (Regressionstest Schritt 6)', async () => {
+    server.use(
+      http.post('http://127.0.0.1:8000/api/analyze', () =>
+        HttpResponse.json({
+          ...SAMPLE_RESULT,
+          techniques: [{ ...SAMPLE_RESULT.techniques[0], mapping_source: 'mitre_derived' }],
+        }),
+      ),
+    )
+
+    renderWithProviders(<Analyzer />)
+    const user = userEvent.setup()
+    await user.type(screen.getByPlaceholderText(/T1566.001/), 'T1078')
+    await user.click(screen.getByRole('button', { name: 'Analysieren' }))
+
+    // "Taktik-Standard" ist auch ein Stat-Kachel-Label im Dashboard-Panel,
+    // deshalb wird hier gezielt der Mapping-Source-Badge der TechniqueCard
+    // geprüft (via MITRE-Mitigation-Text), nicht die Abwesenheit des Strings.
+    await waitFor(() => expect(screen.getByText('MITRE-Mitigation')).toBeInTheDocument())
+  })
+
   it('zeigt eine Fehlermeldung, wenn die Analyse fehlschlägt', async () => {
     server.use(
       http.post('http://127.0.0.1:8000/api/analyze', () =>

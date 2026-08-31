@@ -69,11 +69,13 @@ export function listTechniques(params?: {
   tactic?: string
   status?: string
   q?: string
+  includeDeprecated?: boolean
 }): Promise<TechniqueCatalogResult> {
   const search = new URLSearchParams()
   if (params?.tactic) search.set('tactic', params.tactic)
   if (params?.status) search.set('status', params.status)
   if (params?.q) search.set('q', params.q)
+  if (params?.includeDeprecated) search.set('include_deprecated', 'true')
   const qs = search.toString()
   return request(`/api/techniques${qs ? `?${qs}` : ''}`)
 }

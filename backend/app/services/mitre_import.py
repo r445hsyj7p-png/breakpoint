@@ -45,6 +45,17 @@ DEFAULT_REF = "master"
 
 M_ID_PATTERN = re.compile(r"^M\d+$")
 T_ID_PATTERN = re.compile(r"^T\d+(\.\d+)?$")
+# Absichtlich eng: ref kommt als unauthentifizierter Query-Parameter vom
+# Admin-Endpoint (POST /fetch, kein Auth-Gate vor Schritt 7) und wird
+# direkt in die GitHub-Raw-URL interpoliert — ohne Validierung könnte ein
+# Aufrufer über Pfadsegmente (z. B. "../") versuchen, den Fetch auf einen
+# anderen Pfad umzulenken. Deckt reguläre Branch-/Tag-Namen ab, verbietet
+# ".." explizit.
+GIT_REF_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
+
+
+class InvalidGitRefError(ValueError):
+    """Ungültiger Git-Ref (Branch/Tag) für den MITRE-Bundle-Fetch."""
 
 
 @dataclass
@@ -81,6 +92,8 @@ def fetch_bundle_bytes(ref: str = DEFAULT_REF, timeout: float = 90.0) -> bytes:
     verifiziert erreichbar; TAXII bleibt vorerst unimplementiert, s. Punkt 1).
     Kein Streaming: ein admin-getriggerter, seltener Hintergrund-Job, kein
     Hot-Path (Abschnitt 10e Punkt 2)."""
+    if not GIT_REF_PATTERN.match(ref) or ".." in ref:
+        raise InvalidGitRefError(f"Ungültiger Git-Ref: {ref!r}")
     url = GITHUB_RAW_URL_TEMPLATE.format(ref=ref)
     with httpx.Client(timeout=timeout) as client:
         response = client.get(url)
@@ -147,6 +160,14 @@ def parse_bundle(raw: bytes) -> ParsedBundle:
     mitigates: dict[str, list[str]] = {}
     for obj in objects:
         if obj.get("type") != "relationship":
+            continue
+        # Wie bei attack-pattern/course-of-action (oben) können auch
+        # einzelne Relationship-Objekte selbst revoked/deprecated sein —
+        # z. B. wenn MITRE eine einzelne mitigates-Zuordnung zurückzieht,
+        # ohne die beiden verknüpften Objekte selbst zu revoken. Ohne diese
+        # Prüfung würde eine bereits zurückgezogene Zuordnung im Diff als
+        # gültiger Kandidat wiederauftauchen.
+        if obj.get("revoked") or obj.get("x_mitre_deprecated"):
             continue
         if obj.get("relationship_type") == "subtechnique-of":
             child = techniques.get(obj.get("source_ref"))
@@ -410,6 +431,34 @@ def _snapshot_mapping(db: Session, snapshot: dict, technique_id: str) -> None:
     )
 
 
+def _sort_new_techniques_by_dependency(items: list[dict]) -> list[dict]:
+    """Sortiert eine Liste neuer Techniken so, dass eine neue Eltern-Technik
+    immer vor ihrer neuen Sub-Technique steht. Notwendig, weil
+    parent_technique_id als roher FK-Spaltenwert gesetzt wird (nicht über
+    die ORM-Relationship) — SQLAlchemy sortiert INSERTs dafür nicht
+    automatisch (empirisch verifiziert: Kind-vor-Eltern-Reihenfolge verletzt
+    sonst die FK-Constraint beim db.flush()). Die Bundle-Objektreihenfolge
+    (aus der new_techniques abgeleitet ist) garantiert keine Eltern-vor-Kind-
+    Reihenfolge."""
+    by_id = {item["technique_id"]: item for item in items}
+    ordered: list[dict] = []
+    visited: set[str] = set()
+
+    def visit(item: dict) -> None:
+        tid = item["technique_id"]
+        if tid in visited:
+            return
+        visited.add(tid)
+        parent_item = by_id.get(item.get("parent_technique_id"))
+        if parent_item is not None:
+            visit(parent_item)
+        ordered.append(item)
+
+    for item in items:
+        visit(item)
+    return ordered
+
+
 def apply_batch(db: Session, batch: TechniqueImportBatch, technique_ids: list[str], mitigation_technique_ids: list[str]) -> None:
     """Übernimmt selektiv Teile des berechneten Diffs (Abschnitt 6a.2 Punkt 3
     / 10e.3) und schreibt vorher einen vollständigen Snapshot der
@@ -422,16 +471,27 @@ def apply_batch(db: Session, batch: TechniqueImportBatch, technique_ids: list[st
     selected_mitigation_set = set(mitigation_technique_ids)
     snapshot: dict = {"techniques": {}, "mappings": {}}
 
-    for item in diff["new_techniques"]:
-        if item["technique_id"] not in selected_technique_set:
-            continue
+    selected_new_techniques = [
+        item for item in diff["new_techniques"] if item["technique_id"] in selected_technique_set
+    ]
+    for item in _sort_new_techniques_by_dependency(selected_new_techniques):
         _snapshot_technique(db, snapshot, item["technique_id"])
+        parent_id = item["parent_technique_id"]
+        if parent_id is not None and parent_id not in selected_technique_set and db.get(Technique, parent_id) is None:
+            # Die Eltern-Technik wurde nicht mit übernommen und existiert
+            # auch nicht bereits (z. B. wurde ihr eigenes Checkbox
+            # abgewählt, während die Sub-Technique ausgewählt blieb) — sonst
+            # würde die FK-Constraint verletzt. Die Sub-Technique wird
+            # trotzdem angelegt, nur ohne Eltern-Verknüpfung; sie fällt
+            # dadurch auf den Taktik-Standard zurück, bis ein künftiger
+            # Import die Eltern-Technik nachliefert.
+            parent_id = None
         db.add(
             Technique(
                 id=item["technique_id"],
                 name=item["name"],
                 tactic_id=item["tactic_id"],
-                parent_technique_id=item["parent_technique_id"],
+                parent_technique_id=parent_id,
                 stix_id=item["stix_id"],
                 deprecated=False,
             )
@@ -455,6 +515,14 @@ def apply_batch(db: Session, batch: TechniqueImportBatch, technique_ids: list[st
     for candidate in diff["mitigation_candidates"]:
         tid = candidate["technique_id"]
         if tid not in selected_mitigation_set:
+            continue
+        if db.get(Technique, tid) is None:
+            # Die Technik existiert (noch) nicht — z. B. wurde ihr eigenes
+            # new_techniques-Häkchen abgewählt, obwohl das Mitigation-
+            # Häkchen gesetzt blieb (zwei unabhängige Checkbox-Gruppen im
+            # Frontend). Ohne diese Prüfung würde die FK-Constraint beim
+            # Flush verletzt. Kein Fehler — der Kandidat wird einfach nicht
+            # übernommen, konsistent mit "selektive Übernahme" (10e.3).
             continue
         _snapshot_mapping(db, snapshot, tid)
 

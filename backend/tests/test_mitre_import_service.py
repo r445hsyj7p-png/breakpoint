@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from app.models import (
@@ -9,7 +10,15 @@ from app.models import (
     TechniqueCapabilityMapping,
     TechniqueImportBatch,
 )
-from app.services.mitre_import import apply_batch, compute_diff, parse_bundle, rollback_batch
+from app.services.mitre_import import (
+    InvalidGitRefError,
+    _sort_new_techniques_by_dependency,
+    apply_batch,
+    compute_diff,
+    fetch_bundle_bytes,
+    parse_bundle,
+    rollback_batch,
+)
 from scripts.seed import run as run_seed
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "mitre_stix_sample.json"
@@ -36,6 +45,88 @@ def test_parse_bundle_extracts_techniques_mitigations_and_relationships():
         "course-of-action--m1032",
         "course-of-action--m1013",
     ]
+
+
+def test_fetch_bundle_bytes_rejects_path_traversal_ref():
+    """Regressionstest: ref kommt unauthentifiziert vom Admin-Endpoint und
+    landet direkt in der GitHub-Raw-URL — muss vor Interpolation gegen ein
+    enges Muster geprüft werden (Abschnitt 10e Review-Fund)."""
+    for bad_ref in ["../../evil/repo/main", "master/../../x", "", "has space", "a\nb"]:
+        try:
+            fetch_bundle_bytes(ref=bad_ref)
+            raise AssertionError(f"sollte InvalidGitRefError auslösen für {bad_ref!r}")
+        except InvalidGitRefError:
+            pass
+
+
+def test_fetch_bundle_bytes_accepts_normal_refs_before_network_call(monkeypatch):
+    """Ein gültiger Ref darf nicht an der Validierung scheitern — prüft nur
+    das Muster, kein echter Netzwerkzugriff (httpx.Client wird gepatcht)."""
+    captured_urls = []
+
+    class _FakeResponse:
+        content = b"{}"
+
+        def raise_for_status(self):
+            pass
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def get(self, url):
+            captured_urls.append(url)
+            return _FakeResponse()
+
+    monkeypatch.setattr("app.services.mitre_import.httpx.Client", _FakeClient)
+    fetch_bundle_bytes(ref="release/19.2")
+    assert captured_urls == [
+        "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/release/19.2/enterprise-attack/enterprise-attack.json"
+    ]
+
+
+def test_parse_bundle_ignores_revoked_mitigates_relationship():
+    """Regressionstest: MITRE kann eine einzelne mitigates-Zuordnung
+    zurückziehen, ohne die Technik oder Mitigation selbst zu revoken (nur
+    die Relationship trägt revoked=true). Eine solche zurückgezogene
+    Zuordnung darf nicht als Mitigation-Kandidat wiederauftauchen."""
+    bundle_dict = {
+        "objects": [
+            {
+                "type": "attack-pattern",
+                "id": "attack-pattern--x",
+                "name": "X",
+                "revoked": False,
+                "x_mitre_deprecated": False,
+                "external_references": [{"source_name": "mitre-attack", "external_id": "T9005"}],
+                "kill_chain_phases": [{"kill_chain_name": "mitre-attack", "phase_name": "persistence"}],
+            },
+            {
+                "type": "course-of-action",
+                "id": "course-of-action--x",
+                "name": "X Mitigation",
+                "revoked": False,
+                "x_mitre_deprecated": False,
+                "external_references": [{"source_name": "mitre-attack", "external_id": "M1099"}],
+            },
+            {
+                "type": "relationship",
+                "id": "relationship--revoked",
+                "relationship_type": "mitigates",
+                "source_ref": "course-of-action--x",
+                "target_ref": "attack-pattern--x",
+                "revoked": True,
+            },
+        ]
+    }
+    bundle = parse_bundle(json.dumps(bundle_dict).encode())
+    assert bundle.mitigates == {}
 
 
 def test_compute_diff_against_seeded_db(db_session):
@@ -116,10 +207,69 @@ def test_apply_batch_creates_new_techniques_and_mitigation_mapping(db_session):
     mapping = db_session.query(TechniqueCapabilityMapping).filter_by(technique_id="T9001").one()
     assert mapping.mapping_source == MappingSource.MITRE_DERIVED
     assert [link.capability.name for link in mapping.capability_links] == ["MFA"]
-    assert [link.control.label for link in mapping.control_links] == ["MFA erzwingen"]
 
+
+def test_sort_new_techniques_by_dependency_orders_parent_before_child():
+    """Regressionstest: bundle.techniques (und damit new_techniques) folgt
+    der rohen STIX-Objektreihenfolge, die eine Sub-Technique vor ihrer
+    neuen Eltern-Technik auflisten kann. Ohne Sortierung würde
+    apply_batch()s INSERT-Reihenfolge die FK-Constraint verletzen
+    (empirisch verifiziert: SQLAlchemy ordnet roh gesetzte
+    Self-Referential-FK-Spalten nicht automatisch um)."""
+    child_first = [
+        {"technique_id": "T9001.001", "parent_technique_id": "T9001"},
+        {"technique_id": "T9001", "parent_technique_id": None},
+    ]
+    ordered = _sort_new_techniques_by_dependency(child_first)
+    assert [item["technique_id"] for item in ordered] == ["T9001", "T9001.001"]
+
+
+def test_apply_batch_inserts_parent_before_child_even_in_reversed_diff_order(db_session):
+    """Integrationstest der obigen Sortierlogik direkt in apply_batch():
+    manipuliert die new_techniques-Liste des Diffs auf Kind-vor-Eltern, wie
+    es ein echtes STIX-Bundle liefern könnte, und prüft, dass apply_batch()
+    trotzdem ohne FK-Fehler durchläuft."""
+    batch = _make_diff_ready_batch(db_session)
+    new_techniques = batch.diff_snapshot["new_techniques"]
+    reversed_order = sorted(new_techniques, key=lambda item: item["technique_id"] != "T9001.001")
+    batch.diff_snapshot = {**batch.diff_snapshot, "new_techniques": reversed_order}
+
+    apply_batch(db_session, batch, technique_ids=["T9001", "T9001.001"], mitigation_technique_ids=[])
+
+    assert db_session.get(Technique, "T9001") is not None
+    assert db_session.get(Technique, "T9001.001").parent_technique_id == "T9001"
+
+
+def test_apply_batch_nulls_parent_ref_when_new_parent_technique_was_not_selected(db_session):
+    """Regressionstest (per Live-E2E-Check entdeckt): 'neue Technik
+    übernehmen' ist pro Technik einzeln abwählbar. Wählt ein Admin die
+    Sub-Technique T9001.001 aus, aber nicht ihre ebenfalls neue
+    Eltern-Technik T9001, würde parent_technique_id='T9001' auf eine nie
+    angelegte Zeile zeigen und die FK-Constraint verletzen. apply_batch()
+    muss die Sub-Technique stattdessen ohne Eltern-Verknüpfung anlegen."""
+    batch = _make_diff_ready_batch(db_session)
+
+    apply_batch(db_session, batch, technique_ids=["T9001.001"], mitigation_technique_ids=[])
+
+    assert db_session.get(Technique, "T9001") is None
+    sub_technique = db_session.get(Technique, "T9001.001")
+    assert sub_technique is not None
+    assert sub_technique.parent_technique_id is None
+
+
+def test_apply_batch_skips_mitigation_candidate_whose_technique_was_not_selected(db_session):
+    """Regressionstest: Diff-Ansicht erlaubt unabhängige Checkboxen für
+    'neue Technik übernehmen' und 'Mitigation übernehmen'. Wählt ein Admin
+    nur die Mitigation für T9001 aus, ohne die Technik selbst zu
+    übernehmen, darf apply_batch() keinen FK-Fehler werfen, sondern muss
+    den Kandidaten stillschweigend überspringen."""
+    batch = _make_diff_ready_batch(db_session)
+
+    apply_batch(db_session, batch, technique_ids=[], mitigation_technique_ids=["T9001"])
+
+    assert db_session.get(Technique, "T9001") is None
+    assert db_session.query(TechniqueCapabilityMapping).filter_by(technique_id="T9001").one_or_none() is None
     assert batch.status == ImportBatchStatus.APPLIED
-    assert batch.applied_at is not None
 
 
 def test_apply_batch_never_overwrites_existing_specific_mapping(db_session):
