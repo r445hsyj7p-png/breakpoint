@@ -6,11 +6,13 @@ import { TACTIC_NAMES } from '../lib/tactics'
 
 const STATUS_BADGE = {
   specific: 'bg-prevent-dim text-prevent',
+  mitre_derived: 'bg-portfolio-dim text-portfolio',
   tactic_default: 'bg-detect-dim text-detect',
 } as const
 
 const STATUS_LABEL = {
   specific: 'Spezifisch gemappt',
+  mitre_derived: 'MITRE-Mitigation',
   tactic_default: 'Taktik-Standard',
 } as const
 
@@ -53,6 +55,7 @@ export function Techniques() {
         >
           <option value="">Alle Status</option>
           <option value="specific">Spezifisch gemappt</option>
+          <option value="mitre_derived">MITRE-Mitigation</option>
           <option value="tactic_default">Taktik-Standard</option>
         </select>
         <input

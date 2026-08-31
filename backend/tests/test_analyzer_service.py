@@ -1,4 +1,11 @@
-from app.models import Capability, PortfolioTechnology, PortfolioTechnologyCapability, Technique
+from app.models import (
+    Capability,
+    PortfolioTechnology,
+    PortfolioTechnologyCapability,
+    Technique,
+    TechniqueCapabilityMapping,
+)
+from app.models.mapping import EffortLevel, ImpactLevel, MappingSource
 from app.services.analyzer import analyze, resolve_technique
 from scripts.seed import run as run_seed
 
@@ -22,6 +29,32 @@ def test_specific_mapping_resolves_directly(db_session):
     assert result.mapping_source == "specific"
     assert result.resolved_via_technique_id == "T1078"
     assert "MFA" in result.capabilities
+
+
+def test_resolve_technique_reads_mapping_source_from_db_row_not_hardcoded(db_session):
+    """Regressionstest für den in Abschnitt 6a.3 Punkt 5 dokumentierten Fund:
+    resolve_technique() schrieb mapping_source früher als hartkodierten String
+    "specific", statt den tatsächlichen Wert aus der
+    technique_capability_mapping-Zeile zu lesen. Solange nur 'specific' als
+    Wert für diese Tabelle vorkam, blieb der Bug unsichtbar — dieser Test legt
+    eine Zeile mit einem ANDEREN gültigen MappingSource-Wert an, den der alte
+    Code fälschlich als 'specific' ausgegeben hätte, und prüft, dass der
+    tatsächliche DB-Wert durchgereicht wird. Wird relevant, sobald Schritt 6
+    echte 'mitre_derived'-Zeilen in derselben Tabelle anlegt."""
+    run_seed()
+    technique = db_session.get(Technique, "T1595")  # ohne KB-Eintrag im Seed
+    mapping = TechniqueCapabilityMapping(
+        technique_id=technique.id,
+        mapping_source=MappingSource.TACTIC_DEFAULT,
+        impact=ImpactLevel.MITTEL,
+        effort=EffortLevel.NIEDRIG,
+    )
+    db_session.add(mapping)
+    db_session.commit()
+
+    result = resolve_technique(db_session, "T1595")
+    assert result is not None
+    assert result.mapping_source == "tactic_default"
 
 
 def test_unmapped_technique_falls_back_to_tactic_default(db_session):

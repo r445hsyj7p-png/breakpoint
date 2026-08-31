@@ -8,6 +8,7 @@ class TechniqueSummary(BaseModel):
     technique_name: str
     tactic_name: str
     mapping_source: MappingSourceLiteral
+    deprecated: bool
 
 
 class TechniqueCatalogResult(BaseModel):

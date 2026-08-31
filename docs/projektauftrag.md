@@ -729,16 +729,16 @@ fehlerfrei.
 
 ---
 
-## 10e. Schritt 6 — konkreter Arbeitsauftrag *(neu, v8, Planungsstand — noch nicht umgesetzt)*
+## 10e. Schritt 6 — konkreter Arbeitsauftrag *(v8 geplant, v9 umgesetzt)*
 
-**Ziel von Schritt 6:** Admin-gesteuerter MITRE-ATT&CK-Techniken-Import (Abschnitt 6a.2) mit Diff-Ansicht, Versionierung und Rollback, **plus** MITRE-Mitigations-Bootstrap für spezifische Prevent-Mappings (Abschnitt 6a.3) — beides aus demselben STIX-Bundle, ein Import-Vorgang. Dieser Abschnitt konkretisiert die in 6a.2/6a.3 bereits verabschiedeten Leitplanken zu einem ausführbaren Plan, **noch nicht implementiert** — analog zu 10a-10d wird erst bei explizitem "umsetzen" gebaut.
+**Ziel von Schritt 6:** Admin-gesteuerter MITRE-ATT&CK-Techniken-Import (Abschnitt 6a.2) mit Diff-Ansicht, Versionierung und Rollback, **plus** MITRE-Mitigations-Bootstrap für spezifische Prevent-Mappings (Abschnitt 6a.3) — beides aus demselben STIX-Bundle, ein Import-Vorgang. ✅ Umgesetzt, kritisch geprüft und dokumentiert — Ergebnis der Review-Runde in Abschnitt 10e.5.
 
 **Kritisch vorab geklärt, mit echten Daten verifiziert statt angenommen** (das offizielle STIX-Bundle wurde probeweise geladen und ausgewertet, nicht nur die MITRE-Doku gelesen):
 
 1. ▶ **Netzwerk-Erreichbarkeit unterschiedlich, produktiv zu verifizieren.** In dieser Sandbox ist `raw.githubusercontent.com` erreichbar (das GitHub-Release-Bundle liefert `enterprise-attack.json`, HTTP 200), der öffentliche TAXII-2.1-Server (`attack-taxii.mitre.org`) dagegen von der Sandbox-Netzwerkrichtlinie blockiert (403). Das ist eine Aussage über **diese Entwicklungsumgebung**, nicht zwingend über das Produktivnetz — die Egress-Allowlist (Abschnitt 8) muss dort ohnehin explizit für den Zielhost freigeschaltet werden. Umgesetzt wird der GitHub-Raw-Pfad als primärer Weg (`https://raw.githubusercontent.com/mitre-attack/attack-stix-data/<ref>/enterprise-attack/enterprise-attack.json`), TAXII bleibt als dokumentierte, aber ungetestete Alternative; der manuelle Datei-Upload (6a.2, Punkt 1) funktioniert in jedem Fall unabhängig von der Netzwerkfreigabe.
 2. ▶ **Bundle-Größe verlangt bewusste Verarbeitung, kein naives `json.load()` im Request-Zyklus.** Das aktuelle Enterprise-ATT&CK-Bundle ist **~54 MB, 26.086 STIX-Objekte, davon 21.262 Relationships**. Fetch/Parse/Diff-Berechnung laufen deshalb wie die Sales-Briefing-Generierung (Schritt 5) als admin-getriggerter Hintergrund-Job (`BackgroundTasks`, dieselbe dokumentierte Grenze wie in Abschnitt 10d.2 — kein Verlust bei Worker-Absturz, für einen seltenen, admin-gesteuerten Vorgang akzeptabel). Das berechnete Diff-Ergebnis wird serverseitig zwischengespeichert (eigene Tabelle, s. 10e.1), damit der Admin es in Ruhe prüfen kann, ohne dass ein Reload den 54-MB-Parse-Vorgang wiederholt.
 3. ▶ **Nur 44 von 268 `course-of-action`-Objekten sind aktuelle Mitigations mit echter M-Nummer.** Der Rest sind revoked/deprecated Altobjekte (z. B. ein Objekt mit `external_id: "T1174"` statt `M-Format` — ein Datenrelikt aus einer älteren ATT&CK-Version). Der Import filtert Mitigations auf `revoked == false`, `x_mitre_deprecated != true` **und** `external_references[].external_id` passend zu `^M\d+$` (source_name `mitre-attack`) — sonst würden veraltete/nicht mehr gültige Mitigations in den Bootstrap einfließen.
-4. ▶ **`kill_chain_phases[].phase_name` entspricht exakt der `Tactic.id`-Slug-Konvention dieses Projekts, keine Mapping-Tabelle nötig.** Verifiziert: STIX liefert z. B. `resource-development`, `privilege-escalation`, `defense-evasion` — dieselben Slugs, die `scripts/seed.py::slugify()` bereits aus den Taktik-Namen erzeugt. Die Taktik-Zuordnung importierter Techniken ist damit ein direkter Dictionary-Lookup, keine Heuristik.
+4. ▶ **`kill_chain_phases[].phase_name` entspricht exakt der `Tactic.id`-Slug-Konvention dieses Projekts, keine Mapping-Tabelle nötig — mit einer bei der Umsetzung entdeckten Einschränkung.** Verifiziert: STIX liefert z. B. `resource-development`, `privilege-escalation` — dieselben Slugs, die `scripts/seed.py::slugify()` bereits aus den Taktik-Namen erzeugt, für 13 der 14 Taktiken exakt deckungsgleich. Die Taktik-Zuordnung importierter Techniken ist damit größtenteils ein direkter Dictionary-Lookup, keine Heuristik. **Einschränkung (Fund während der Umsetzung, siehe 10e.5 und Abschnitt 12 Frage 10):** `defense-evasion` kommt im aktuellen Bundle als Phase gar nicht mehr vor — MITRE hat diese Taktik in "Stealth" umbenannt und eine neue 15. Taktik "Defense Impairment" ergänzt. Der Diff behandelt nicht zuordenbare Phasen transparent (`unmapped_tactic_phase_techniques`) statt falsch zu klassifizieren oder abzustürzen.
 5. **Sub-Technique-Erkennung bestätigt wie in Abschnitt 5 geplant.** `x_mitre_is_subtechnique: true` + eine `subtechnique-of`-Relationship (477 im Bundle) liefern die Eltern-Kind-Beziehung strukturiert — keine Prefix-Parsing-Heuristik auf der ID nötig, wie schon in Abschnitt 5/10a.3 festgelegt.
 6. **Vorbedingung aus Abschnitt 6a.3 Punkt 5 wird in Schritt 6 zuerst erledigt:** `resolve_technique()` (`backend/app/services/analyzer.py`) muss von hartkodierten `mapping_source`-Strings auf `mapping.mapping_source.value` umgestellt werden, **bevor** `mitre_derived`-Zeilen entstehen können — sonst würden sie stillschweigend als `"specific"` ausgegeben. Erster Teilschritt der Umsetzung, mit eigenem Regressionstest (bestehendes Verhalten für `specific`/`tactic_default` darf sich nicht ändern).
 7. **`mapping_source`-Enum-Erweiterung ist eine echte Migration.** Nativer Postgres-Enum-Typ `mapping_source` bekommt per Alembic `op.execute("ALTER TYPE mapping_source ADD VALUE 'mitre_derived'")` außerhalb einer Transaktion (Alembic unterstützt das über `with op.get_context().autocommit_block()`) einen dritten Wert — kein additiver Tabellen-Change, aber ein PostgreSQL-Spezifikum, das die Migration explizit dokumentieren muss.
@@ -787,15 +787,106 @@ Neuer Admin-Bereich (eigene Route, nicht mit dem bestehenden Portfolio-Tab vermi
 
 ### 10e.5 Definition of Done für Schritt 6
 
-- [ ] `resolve_technique()` liest `mapping_source` aus der DB-Zeile statt hartkodierter Strings (Regressionstest für bestehendes `specific`/`tactic_default`-Verhalten)
-- [ ] Migration: `technique.deprecated`/`technique.stix_id`, `technique_import_batch`-Tabelle, `mapping_source`-Enum-Erweiterung um `mitre_derived`
-- [ ] Fetch gegen ein echtes (oder als Fixture eingefrorenes) STIX-Bundle liefert einen korrekten Diff für einen bekannten Ausschnitt (z. B. eine gezielt veränderte Kopie mit einer neuen/umbenannten/deprecated Technik)
-- [ ] Bestehende `specific`-Mappings werden von einem Import nie überschrieben, Konflikt wird im Diff sichtbar
-- [ ] Mitigation-Bootstrap: gefilterte Mitigations (M-Nummer, nicht revoked/deprecated) mit Crosswalk-Treffer erzeugen `mitre_derived`-Kandidaten mit von der Taktik geerbtem impact/effort
-- [ ] `apply` ist selektiv (Admin kann Teilmengen übernehmen), schreibt `pre_apply_snapshot`
-- [ ] `rollback` stellt den Vorzustand korrekt wieder her, nur für den jeweils letzten Batch möglich
-- [ ] Frontend zeigt Diff-Ansicht + selektive Übernahme + Import-Historie mit Rollback
-- [ ] `pytest`, `npm run test`, `ruff`, `oxlint`, `tsc -b`, `npm run build` weiterhin grün
+- [x] `resolve_technique()` liest `mapping_source` aus der DB-Zeile statt hartkodierter Strings (Regressionstest für bestehendes `specific`/`tactic_default`-Verhalten)
+- [x] Migration: `technique.deprecated`/`technique.stix_id`, `technique_import_batch`-Tabelle, `mapping_source`-Enum-Erweiterung um `mitre_derived`
+- [x] Fetch gegen ein echtes (oder als Fixture eingefrorenes) STIX-Bundle liefert einen korrekten Diff für einen bekannten Ausschnitt (z. B. eine gezielt veränderte Kopie mit einer neuen/umbenannten/deprecated Technik)
+- [x] Bestehende `specific`-Mappings werden von einem Import nie überschrieben, Konflikt wird im Diff sichtbar
+- [x] Mitigation-Bootstrap: gefilterte Mitigations (M-Nummer, nicht revoked/deprecated) mit Crosswalk-Treffer erzeugen `mitre_derived`-Kandidaten mit von der Taktik geerbtem impact/effort
+- [x] `apply` ist selektiv (Admin kann Teilmengen übernehmen), schreibt `pre_apply_snapshot`
+- [x] `rollback` stellt den Vorzustand korrekt wieder her, nur für den jeweils letzten Batch möglich
+- [x] Frontend zeigt Diff-Ansicht + selektive Übernahme + Import-Historie mit Rollback
+- [x] `pytest`, `npm run test`, `ruff`, `oxlint`, `tsc -b`, `npm run build` weiterhin grün
+
+**Ergebnis der kritischen Review-Runde:**
+
+Implementiert: `resolve_technique()`-Bugfix samt gezieltem Regressionstest
+(legt eine `technique_capability_mapping`-Zeile mit einem anderen Wert als
+`specific` an — mit dem alten hartkodierten Code wäre das trotzdem als
+`"specific"` ausgegeben worden); Migration für `technique.deprecated`
+(Soft-Delete, nie Hard-Delete), `technique.stix_id` (unique), die neue
+`technique_import_batch`-Tabelle und die native-Enum-Erweiterung um
+`mitre_derived` (per `ALTER TYPE ... ADD VALUE` in einem
+`autocommit_block()`, da Postgres das außerhalb einer Transaktion verlangt);
+der kuratierte `MITIGATION_CROSSWALK` (30 von 44 aktuellen M-Nummern
+gegen echte, in dieser Session aus dem offiziellen STIX-Bundle gezogene
+Mitigation-Namen abgeglichen, inkl. deutscher Control-Label, die bewusst
+bestehende KB-Controls wiederverwenden statt englische Duplikate
+anzulegen); `app/services/mitre_import.py` mit reiner
+`parse_bundle()`-Funktion, DB-abhängiger `compute_diff()`,
+`apply_batch()`/`rollback_batch()` mit vollständigem Vorzustand-Snapshot;
+vier Endpunkte inkl. Datei-Upload und GitHub-Fetch via `BackgroundTasks`;
+Frontend-Admin-Bereich mit Diff-Ansicht, Checkbox-Auswahl,
+Import-Historie und Rollback-Button (nur auf dem jeweils letzten
+angewendeten Batch).
+
+**Verifiziert gegen echte MITRE-Daten, nicht nur Annahmen:** Das
+offizielle STIX-Bundle wurde in dieser Session mehrfach real geladen
+(~54 MB, aktuelle Version 19.2) und `parse_bundle()`/`compute_diff()`
+testweise dagegen ausgeführt (1,6 s Parse-Zeit, <0,2 s Diff-Berechnung
+gegen die Seed-DB) — nicht nur gegen das kleine Test-Fixture. Dabei
+gefundene, konkrete Fakten statt Annahmen: 858 Techniken, 44 aktuelle
+Mitigations, 477 aufgelöste Sub-Technique-Elternbeziehungen, 366
+Mitigation-Kandidaten und 10 Konflikte mit bestehenden `specific`-Mappings
+auf dem aktuellen Seed-Datensatz.
+
+**Bei der Review gefundene und behobene Bugs (echte Funde, nicht nur
+kosmetisch):**
+1. **Zweites Vorkommen desselben hartkodierten-`mapping_source`-Bugs in
+   `app/services/catalog.py`.** Der ursprüngliche Fund (Abschnitt 6a.3
+   Punkt 5) betraf nur `resolve_technique()` — beim Bauen von Schritt 6
+   fiel auf, dass `list_techniques()` (der Techniken-Katalog-Endpunkt,
+   `GET /api/techniques`) denselben Fehler unabhängig enthielt: es wurde
+   nur geprüft, *ob* eine Zeile in `technique_capability_mapping`
+   existiert, nicht welchen `mapping_source`-Wert sie trägt — jede
+   `mitre_derived`-Zeile wäre im Katalog fälschlich als `"specific"`
+   angezeigt worden. Mit Regressionstest behoben (liest jetzt den
+   tatsächlichen Wert), inklusive Fallback über `parent_technique_id` für
+   Sub-Techniken wie zuvor.
+2. **`technique.deprecated` wäre ein Flag ohne Wirkung geblieben.** Ein
+   neues Feld, das nirgends gelesen wird, ist toter Code — der
+   Techniken-Katalog blendet deprecated Techniken jetzt standardmäßig aus
+   (`include_deprecated=true` zeigt sie zusätzlich), analog zum
+   `active`-Flag bei `portfolio_technology` (Abschnitt 10c). Mit
+   Regressionstest.
+3. **`stix_id` ohne Unique-Constraint hätte mehrdeutige Diffs erlaubt.**
+   Ursprünglich nur `nullable=True` ohne Eindeutigkeit — zwei
+   `technique`-Zeilen hätten (bei einem Datenfehler) auf dieselbe
+   STIX-UUID zeigen können, was die stix_id-basierte Zuordnung beim
+   nächsten Import mehrdeutig gemacht hätte. Vor dem ersten produktiven
+   Einsatz der Migration ergänzt (`UNIQUE`-Constraint), inklusive eines
+   vollständigen Downgrade/Upgrade-Testlaufs, der dabei einen echten
+   Alembic-Bug aufdeckte und behob (siehe Punkt 4).
+4. **Alembic-Downgrade ließ verwaiste Postgres-ENUM-Typen zurück.** Der
+   autogenerierte `downgrade()` droppte die `technique_import_batch`-
+   Tabelle, aber nicht die für ihre Spalten angelegten nativen ENUM-Typen
+   (`import_source`, `import_batch_status`) — ein erneutes `upgrade()`
+   scheiterte dadurch mit "type already exists". In dieser Session so
+   reproduziert (Downgrade→Upgrade-Testlauf) und behoben (`sa.Enum(...).drop()`
+   ergänzt); ein zweiter Downgrade→Upgrade-Zyklus bestätigt die Reparatur.
+
+**Offener Punkt, bewusst nicht in Schritt 6 gelöst, sondern dokumentiert:**
+Das offizielle STIX-Bundle zeigt, dass MITRE die Taktik "Defense Evasion"
+(TA0005) inzwischen in **"Stealth"** umbenannt und eine **neue 15. Taktik
+"Defense Impairment" (TA0112)** eingeführt hat — dieses Projekt bildet
+weiterhin die ursprünglichen 14 Taktiken ab. Ein Import gegen das aktuelle
+Bundle würde deshalb ca. 204 von 858 Techniken (~24 %) als
+`unmapped_tactic_phase_techniques` melden, statt sie einer Taktik
+zuzuordnen — das ist kein Absturz und kein stiller Fehler (die Diff-Logik
+fängt das transparent ab und zeigt es dem Admin an), aber ein spürbarer
+Anteil. Eine Auflösung (Taktik umbenennen vs. 15. Taktik ergänzen) berührt
+mehrere Stellen außerhalb von Schritt 6 (Frontend-Taktik-Dropdown,
+Dokumentensprache "14 Taktiken" an mehreren Stellen) und wird deshalb
+bewusst nicht hier mitentschieden, sondern als neue offene Frage in
+Abschnitt 12 aufgenommen.
+
+85 Backend-Tests + 13 Frontend-Tests grün (inkl. 20 neuer Backend- und 3
+neuer Frontend-Tests für Schritt 6), `ruff check app/ tests/ scripts/`,
+`oxlint`, `tsc -b --noEmit` und `npm run build` fehlerfrei. Der volle
+Import→Diff→Übernahme→Rollback-Zyklus wurde zusätzlich end-to-end im
+Browser gegen echtes Backend + Frontend verifiziert (Datei-Upload des
+Test-Fixtures, Diff-Ansicht, selektive Übernahme, Bestätigung im
+Techniken-Katalog inkl. korrektem Sub-Technique-Fallback, Rollback,
+erneute Prüfung im Katalog).
 
 ---
 
@@ -805,7 +896,7 @@ Neuer Admin-Bereich (eigene Route, nicht mit dem bestehenden Portfolio-Tab vermi
 - **Schritt 3:** ✅ siehe Abschnitt 10b (konkretisiert)
 - **Schritt 4:** ✅ siehe Abschnitt 10c (konkretisiert)
 - **Schritt 5:** ✅ siehe Abschnitt 10d (konkretisiert)
-- **Schritt 6:** ▶ siehe Abschnitt 10e (konkretisiert, Planungsstand — Umsetzung steht noch aus)
+- **Schritt 6:** ✅ siehe Abschnitt 10e (konkretisiert und umgesetzt)
 - **Schritt 7:** Reporting/Export, Rollenmodell/Auth-Anbindung, Audit-Log-UI
 
 ---
@@ -821,5 +912,6 @@ Neuer Admin-Bereich (eigene Route, nicht mit dem bestehenden Portfolio-Tab vermi
 7. ▶ *(neu, v2)* Welches selbst gehostete Logging-/Monitoring-Setup soll genutzt werden (z. B. Loki/Grafana), da externe SaaS-Fehler-Tracking-Dienste laut Abschnitt 2 ausgeschlossen sind?
 8. ▶ *(neu, v2)* Gibt es eine Datenretention-/Löschpflicht für Engagement-Daten nach Projektabschluss (Kundenschwachstellen-Daten)?
 9. ▶ *(neu, v2)* Genaue Gewichtungsformel für "Kettenabdeckung" in der Priorisierung (Abschnitt 2a/11): reine Zählung betroffener Techniken, oder gewichtet nach Position in der Kette (z. B. früher Breakpoint wertvoller)? Sollte vor Schritt 2 grob festgelegt werden, muss aber nicht in Schritt 1 final sein.
+10. ▶ *(neu, v9, Fund aus Schritt 6)* MITRE hat die Taktik "Defense Evasion" (TA0005) im aktuellen STIX-Bundle in **"Stealth"** umbenannt und eine **neue 15. Taktik "Defense Impairment" (TA0112)** eingeführt — dieses Projekt bildet weiterhin die ursprünglichen 14 Taktiken ab (Abschnitt 10e.5). Ein Import gegen das aktuelle Bundle würde deshalb ca. 24 % der Techniken als nicht zuordenbar melden statt sie zu klassifizieren. Zu entscheiden, bevor ein produktiver MITRE-Import gegen die aktuelle ATT&CK-Version durchgeführt wird: Taktik "defense-evasion" umbenennen (Auswirkung auf bestehende `technique.tactic_id`-Werte, `tactic_default_mapping`, Frontend-Taktik-Dropdown) oder "Defense Impairment" als 15. Taktik ergänzen (Auswirkung auf jede Stelle, die "14 Taktiken" annimmt) — oder beides.
 
-Diese Fragen blockieren Schritt 1 nicht zwingend (sinnvolle Defaults sind oben angegeben), sollten aber vor Schritt 5 (LLM-Anbindung) und vor einem produktiven Deployment final geklärt sein. Fragen 2 und 5 sollten idealerweise **vor** dem ersten Commit geklärt sein, da sie sich sonst flächendeckend (Formatierung, Dockerfiles) niederschlagen und später aufwändig nachgezogen werden müssten.
+Diese Fragen blockieren Schritt 1 nicht zwingend (sinnvolle Defaults sind oben angegeben), sollten aber vor Schritt 5 (LLM-Anbindung) und vor einem produktiven Deployment final geklärt sein. Fragen 2 und 5 sollten idealerweise **vor** dem ersten Commit geklärt sein, da sie sich sonst flächendeckend (Formatierung, Dockerfiles) niederschlagen und später aufwändig nachgezogen werden müssten. Frage 10 sollte vor dem ersten produktiven MITRE-Import (Schritt 6) geklärt sein, blockiert aber Schritt 6 selbst nicht (die Diff-Ansicht behandelt unmappbare Techniken bereits transparent, statt sie stillschweigend falsch zuzuordnen).

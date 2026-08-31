@@ -1,0 +1,151 @@
+{
+  "type": "bundle",
+  "id": "bundle--test-fixture",
+  "spec_version": "2.1",
+  "objects": [
+    {
+      "type": "x-mitre-collection",
+      "id": "x-mitre-collection--test",
+      "name": "Enterprise ATT&CK (Test-Fixture)",
+      "x_mitre_version": "99.9"
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--new-001",
+      "name": "Synthetic New Technique",
+      "revoked": false,
+      "x_mitre_deprecated": false,
+      "x_mitre_is_subtechnique": false,
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T9001", "url": "https://attack.mitre.org/techniques/T9001"}
+      ],
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--new-001-sub",
+      "name": "Synthetic New Sub-Technique",
+      "revoked": false,
+      "x_mitre_deprecated": false,
+      "x_mitre_is_subtechnique": true,
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T9001.001", "url": "https://attack.mitre.org/techniques/T9001/001"}
+      ],
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "persistence"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--existing-t1078",
+      "name": "Valid Accounts (Renamed In Fixture)",
+      "revoked": false,
+      "x_mitre_deprecated": false,
+      "x_mitre_is_subtechnique": false,
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1078", "url": "https://attack.mitre.org/techniques/T1078"}
+      ],
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "initial-access"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--existing-t1003-revoked",
+      "name": "OS Credential Dumping",
+      "revoked": true,
+      "x_mitre_deprecated": false,
+      "x_mitre_is_subtechnique": false,
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1003", "url": "https://attack.mitre.org/techniques/T1003"}
+      ],
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "credential-access"}
+      ]
+    },
+    {
+      "type": "attack-pattern",
+      "id": "attack-pattern--unmapped-phase",
+      "name": "Synthetic Unmapped Phase Technique",
+      "revoked": false,
+      "x_mitre_deprecated": false,
+      "x_mitre_is_subtechnique": false,
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T9002", "url": "https://attack.mitre.org/techniques/T9002"}
+      ],
+      "kill_chain_phases": [
+        {"kill_chain_name": "mitre-attack", "phase_name": "stealth"}
+      ]
+    },
+    {
+      "type": "course-of-action",
+      "id": "course-of-action--m1032",
+      "name": "Multi-factor Authentication",
+      "revoked": false,
+      "x_mitre_deprecated": false,
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "M1032", "url": "https://attack.mitre.org/mitigations/M1032"}
+      ]
+    },
+    {
+      "type": "course-of-action",
+      "id": "course-of-action--m1013",
+      "name": "Application Developer Guidance",
+      "revoked": false,
+      "x_mitre_deprecated": false,
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "M1013", "url": "https://attack.mitre.org/mitigations/M1013"}
+      ]
+    },
+    {
+      "type": "course-of-action",
+      "id": "course-of-action--m1030",
+      "name": "Network Segmentation",
+      "revoked": false,
+      "x_mitre_deprecated": false,
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "M1030", "url": "https://attack.mitre.org/mitigations/M1030"}
+      ]
+    },
+    {
+      "type": "course-of-action",
+      "id": "course-of-action--legacy-revoked",
+      "name": "Legacy Revoked Mitigation",
+      "revoked": true,
+      "x_mitre_deprecated": false,
+      "external_references": [
+        {"source_name": "mitre-attack", "external_id": "T1174", "url": "https://attack.mitre.org/mitigations/T1174"}
+      ]
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--subtechnique-of-001",
+      "relationship_type": "subtechnique-of",
+      "source_ref": "attack-pattern--new-001-sub",
+      "target_ref": "attack-pattern--new-001"
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--mitigates-001",
+      "relationship_type": "mitigates",
+      "source_ref": "course-of-action--m1032",
+      "target_ref": "attack-pattern--new-001"
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--mitigates-002",
+      "relationship_type": "mitigates",
+      "source_ref": "course-of-action--m1013",
+      "target_ref": "attack-pattern--new-001"
+    },
+    {
+      "type": "relationship",
+      "id": "relationship--mitigates-003",
+      "relationship_type": "mitigates",
+      "source_ref": "course-of-action--m1030",
+      "target_ref": "attack-pattern--existing-t1078"
+    }
+  ]
+}

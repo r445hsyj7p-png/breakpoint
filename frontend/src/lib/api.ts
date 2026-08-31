@@ -14,6 +14,8 @@ export type CoverageResult = components['schemas']['CoverageResult']
 export type CoverageRow = components['schemas']['CoverageRow']
 export type CapabilityRead = components['schemas']['CapabilityRead']
 export type SalesBriefingRead = components['schemas']['SalesBriefingRead']
+export type ImportBatchRead = components['schemas']['ImportBatchRead']
+export type ImportDiff = components['schemas']['ImportDiff']
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 
@@ -136,4 +138,53 @@ export function markSalesBriefingReviewed(
     method: 'POST',
     body: JSON.stringify({ reviewed_by: reviewedBy ?? null }),
   })
+}
+
+export function triggerMitreImportFetch(triggeredBy?: string): Promise<ImportBatchRead> {
+  const search = new URLSearchParams()
+  if (triggeredBy) search.set('triggered_by', triggeredBy)
+  const qs = search.toString()
+  return request(`/api/admin/mitre-import/fetch${qs ? `?${qs}` : ''}`, { method: 'POST' })
+}
+
+export async function uploadMitreImportBundle(file: File, triggeredBy?: string): Promise<ImportBatchRead> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const search = new URLSearchParams()
+  if (triggeredBy) search.set('triggered_by', triggeredBy)
+  const qs = search.toString()
+  // Kein request()-Helper hier: der setzt Content-Type: application/json
+  // fest, das würde die vom Browser automatisch gesetzte
+  // multipart/form-data-Boundary überschreiben.
+  const response = await fetch(`${BASE_URL}/api/admin/mitre-import/upload${qs ? `?${qs}` : ''}`, {
+    method: 'POST',
+    body: formData,
+  })
+  if (!response.ok) {
+    const body = await response.text()
+    throw new ApiError(response.status, body || response.statusText)
+  }
+  return response.json() as Promise<ImportBatchRead>
+}
+
+export function listMitreImportBatches(): Promise<ImportBatchRead[]> {
+  return request('/api/admin/mitre-import/batches')
+}
+
+export function getMitreImportBatch(batchId: number): Promise<ImportBatchRead> {
+  return request(`/api/admin/mitre-import/batches/${batchId}`)
+}
+
+export function applyMitreImportBatch(
+  batchId: number,
+  selection: { technique_ids: string[]; mitigation_technique_ids: string[] },
+): Promise<ImportBatchRead> {
+  return request(`/api/admin/mitre-import/batches/${batchId}/apply`, {
+    method: 'POST',
+    body: JSON.stringify(selection),
+  })
+}
+
+export function rollbackMitreImportBatch(batchId: number): Promise<ImportBatchRead> {
+  return request(`/api/admin/mitre-import/batches/${batchId}/rollback`, { method: 'POST' })
 }

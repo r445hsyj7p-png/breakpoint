@@ -5,6 +5,7 @@ from app.api.analyzer import router as analyzer_router
 from app.api.capabilities import router as capabilities_router
 from app.api.engagements import router as engagements_router
 from app.api.health import router as health_router
+from app.api.mitre_import import router as mitre_import_router
 from app.api.portfolio import router as portfolio_router
 from app.api.sales_briefing import router as sales_briefing_router
 from app.api.techniques import router as techniques_router
@@ -26,3 +27,4 @@ app.include_router(techniques_router)
 app.include_router(portfolio_router)
 app.include_router(capabilities_router)
 app.include_router(sales_briefing_router)
+app.include_router(mitre_import_router)

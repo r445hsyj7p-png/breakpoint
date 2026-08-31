@@ -42,6 +42,28 @@ describe('Techniques', () => {
     expect(requestedPaths).toContain('/api/techniques')
   })
 
+  it('zeigt mitre_derived-Techniken mit eigenem Status-Label (Regressionstest Schritt 6)', async () => {
+    server.use(
+      http.get('http://127.0.0.1:8000/api/techniques', () =>
+        HttpResponse.json({
+          techniques: [
+            {
+              technique_id: 'T1210',
+              technique_name: 'Exploitation of Remote Services',
+              tactic_name: 'Lateral Movement',
+              mapping_source: 'mitre_derived',
+            },
+          ],
+          total: 1,
+        }),
+      ),
+    )
+
+    renderWithProviders(<Techniques />)
+
+    await waitFor(() => expect(screen.getByText('MITRE-Mitigation')).toBeInTheDocument())
+  })
+
   it('zeigt einen Hinweis, wenn kein Ergebnis zur Filterkombination passt', async () => {
     server.use(
       http.get('http://127.0.0.1:8000/api/techniques', () =>

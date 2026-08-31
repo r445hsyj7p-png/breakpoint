@@ -59,7 +59,7 @@ def resolve_technique(db: Session, technique_id: str) -> TechniqueResult | None:
             technique_id=technique_id,
             technique_name=technique.name,
             tactic_name=technique.tactic.name,
-            mapping_source="specific",
+            mapping_source=mapping.mapping_source.value,
             resolved_via_technique_id=resolved_via_technique_id,
             impact=mapping.impact.value,
             effort=mapping.effort.value,

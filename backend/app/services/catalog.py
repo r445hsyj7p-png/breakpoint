@@ -18,12 +18,18 @@ def list_techniques(
     tactic_name: str | None = None,
     status: str | None = None,
     q: str | None = None,
+    include_deprecated: bool = False,
 ) -> TechniqueCatalogResult:
     # Jede Zeile braucht ohnehin den Taktik-Namen (s.u.) — ein einziger Join,
     # dessen Ergebnis über contains_eager() sowohl fürs Filtern als auch fürs
     # Befüllen von technique.tactic wiederverwendet wird (kein Doppel-Join,
     # wie es joinedload() zusätzlich zu einem expliziten .join() erzeugen würde).
     query = db.query(Technique).join(Tactic).options(contains_eager(Technique.tactic))
+    if not include_deprecated:
+        # Soft-Delete-Prinzip (Abschnitt 5/10e.1) — analog dem active-Flag
+        # bei portfolio_technology: standardmäßig ausgeblendet, nie hart
+        # gelöscht, historische Findings/Reports bleiben referenzierbar.
+        query = query.filter(Technique.deprecated.is_(False))
     if tactic_name:
         query = query.filter(Tactic.name == tactic_name)
     if q:
@@ -33,25 +39,35 @@ def list_techniques(
         )
     techniques = query.order_by(Technique.id).all()
 
-    # Eine einzige Abfrage statt einer Fallback-Kette pro Technik: alle
-    # technique_ids mit spezifischem Mapping, dann in Python gegen die
+    # Eine einzige Abfrage statt einer Fallback-Kette pro Technik: das
+    # tatsächliche mapping_source je Technik-ID lesen (nicht nur "existiert
+    # eine Zeile" — seit Schritt 6 kann diese Zeile auch 'mitre_derived'
+    # sein, nicht nur 'specific'; Regressionsfund analog resolve_technique(),
+    # Abschnitt 6a.3 Punkt 5), dann in Python gegen die
     # (Sub-Technique -> parent_technique_id)-Beziehung abgleichen.
-    specific_ids = {
-        technique_id for (technique_id,) in db.query(TechniqueCapabilityMapping.technique_id).all()
+    mapping_source_by_technique_id = {
+        technique_id: mapping_source.value
+        for (technique_id, mapping_source) in db.query(
+            TechniqueCapabilityMapping.technique_id, TechniqueCapabilityMapping.mapping_source
+        ).all()
     }
 
     summaries = []
     for technique in techniques:
-        has_specific = technique.id in specific_ids or (
-            technique.parent_technique_id is not None
-            and technique.parent_technique_id in specific_ids
-        )
+        own_source = mapping_source_by_technique_id.get(technique.id)
+        if own_source is not None:
+            mapping_source = own_source
+        elif technique.parent_technique_id is not None and technique.parent_technique_id in mapping_source_by_technique_id:
+            mapping_source = mapping_source_by_technique_id[technique.parent_technique_id]
+        else:
+            mapping_source = "tactic_default"
         summaries.append(
             TechniqueSummary(
                 technique_id=technique.id,
                 technique_name=technique.name,
                 tactic_name=technique.tactic.name,
-                mapping_source="specific" if has_specific else "tactic_default",
+                mapping_source=mapping_source,
+                deprecated=technique.deprecated,
             )
         )
 

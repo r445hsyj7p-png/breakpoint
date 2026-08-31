@@ -117,8 +117,10 @@ export interface paths {
          * Get Techniques
          * @description Techniken-Katalog mit Mapping-Status je Technik, für den 'Alle
          *     Techniken'-Tab (docs/projektauftrag.md Abschnitt 10b.1). `tactic` filtert
-         *     nach Taktik-Name, `status` nach 'specific'/'tactic_default', `q` durchsucht
-         *     Technik-ID und -Name (case-insensitive).
+         *     nach Taktik-Name, `status` nach 'specific'/'tactic_default'/'mitre_derived',
+         *     `q` durchsucht Technik-ID und -Name (case-insensitive). Von MITRE als
+         *     deprecated markierte Techniken (Abschnitt 10e) sind standardmäßig
+         *     ausgeblendet, `include_deprecated=true` zeigt sie zusätzlich an.
          */
         get: operations["get_techniques_api_techniques_get"];
         put?: never;
@@ -294,6 +296,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/mitre-import/fetch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Fetch
+         * @description Legt sofort eine diff_pending-Zeile an und gibt 202 zurück; Fetch (vom
+         *     offiziellen GitHub-Raw-Bundle) + Parsing + Diff-Berechnung laufen
+         *     asynchron im Hintergrund (Abschnitt 10e Punkt 2).
+         */
+        post: operations["post_fetch_api_admin_mitre_import_fetch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/mitre-import/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Upload
+         * @description Wie /fetch, aber mit einer manuell hochgeladenen STIX-Bundle-Datei
+         *     statt eines GitHub-Fetches (Abschnitt 6a.2 Punkt 1 — Fallback, falls der
+         *     Server keinen Internetzugriff hat).
+         */
+        post: operations["post_upload_api_admin_mitre_import_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/mitre-import/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Batches */
+        get: operations["list_batches_api_admin_mitre_import_batches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/mitre-import/batches/{batch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Batch */
+        get: operations["get_batch_api_admin_mitre_import_batches__batch_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/mitre-import/batches/{batch_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Apply Batch */
+        post: operations["post_apply_batch_api_admin_mitre_import_batches__batch_id__apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/mitre-import/batches/{batch_id}/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Rollback Batch */
+        post: operations["post_rollback_batch_api_admin_mitre_import_batches__batch_id__rollback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -314,12 +428,39 @@ export interface components {
             /** Prioritized Measures */
             prioritized_measures: components["schemas"]["PrioritizedMeasure"][];
         };
+        /** ApplySelection */
+        ApplySelection: {
+            /**
+             * Technique Ids
+             * @default []
+             */
+            technique_ids: string[];
+            /**
+             * Mitigation Technique Ids
+             * @default []
+             */
+            mitigation_technique_ids: string[];
+        };
+        /** Body_post_upload_api_admin_mitre_import_upload_post */
+        Body_post_upload_api_admin_mitre_import_upload_post: {
+            /** File */
+            file: string;
+        };
         /** CapabilityRead */
         CapabilityRead: {
             /** Id */
             id: number;
             /** Name */
             name: string;
+        };
+        /** ConflictDiffItem */
+        ConflictDiffItem: {
+            /** Technique Id */
+            technique_id: string;
+            /** Mitigations */
+            mitigations: components["schemas"]["MitigationEntry"][];
+            /** Reason */
+            reason: string;
         };
         /** ControlRef */
         ControlRef: {
@@ -347,6 +488,13 @@ export interface components {
             /** Covering Technologies */
             covering_technologies: string[];
         };
+        /** DeprecatedTechniqueDiffItem */
+        DeprecatedTechniqueDiffItem: {
+            /** Technique Id */
+            technique_id: string;
+            /** Name */
+            name: string;
+        };
         /** EngagementCreate */
         EngagementCreate: {
             /** Name */
@@ -365,6 +513,13 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** FieldChange */
+        FieldChange: {
+            /** Old */
+            old: string | null;
+            /** New */
+            new: string | null;
+        };
         /** FindingsCreate */
         FindingsCreate: {
             /** Codes */
@@ -381,6 +536,58 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** ImportBatchRead */
+        ImportBatchRead: {
+            /** Id */
+            id: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "github_raw" | "taxii" | "manual_upload";
+            /** Source Ref */
+            source_ref: string | null;
+            /** Bundle Version */
+            bundle_version: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "diff_pending" | "diff_ready" | "applied" | "rolled_back" | "failed";
+            /** Triggered By */
+            triggered_by: string | null;
+            diff_snapshot: components["schemas"]["ImportDiff"] | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Applied At */
+            applied_at: string | null;
+            /** Rolled Back At */
+            rolled_back_at: string | null;
+        };
+        /** ImportDiff */
+        ImportDiff: {
+            /** Bundle Version */
+            bundle_version: string | null;
+            /** New Techniques */
+            new_techniques: components["schemas"]["NewTechniqueDiffItem"][];
+            /** Updated Techniques */
+            updated_techniques: components["schemas"]["UpdatedTechniqueDiffItem"][];
+            /** Newly Deprecated Techniques */
+            newly_deprecated_techniques: components["schemas"]["DeprecatedTechniqueDiffItem"][];
+            /** Unmapped Tactic Phase Techniques */
+            unmapped_tactic_phase_techniques: components["schemas"]["UnmappedTacticPhaseItem"][];
+            /** Mitigation Candidates */
+            mitigation_candidates: components["schemas"]["MitigationCandidateDiffItem"][];
+            /** Skipped Mitigations Without Crosswalk */
+            skipped_mitigations_without_crosswalk: components["schemas"]["SkippedMitigationItem"][];
+            /** Conflicts */
+            conflicts: components["schemas"]["ConflictDiffItem"][];
         };
         /** MarkReviewedRequest */
         MarkReviewedRequest: {
@@ -403,6 +610,43 @@ export interface components {
              * @description Ein wahrscheinlicher Kundeneinwand + Gegenargument
              */
             einwand_antizipation: string;
+        };
+        /** MitigationCandidateDiffItem */
+        MitigationCandidateDiffItem: {
+            /** Technique Id */
+            technique_id: string;
+            /** Mitigations */
+            mitigations: components["schemas"]["MitigationEntry"][];
+            /** Capabilities */
+            capabilities: string[];
+            /** Control Labels */
+            control_labels: string[];
+            /** Impact */
+            impact: string;
+            /** Effort */
+            effort: string;
+        };
+        /** MitigationEntry */
+        MitigationEntry: {
+            /** M Id */
+            m_id: string;
+            /** Mitigation Name */
+            mitigation_name: string;
+            /** Control Label */
+            control_label: string;
+        };
+        /** NewTechniqueDiffItem */
+        NewTechniqueDiffItem: {
+            /** Technique Id */
+            technique_id: string;
+            /** Name */
+            name: string;
+            /** Tactic Id */
+            tactic_id: string;
+            /** Parent Technique Id */
+            parent_technique_id: string | null;
+            /** Stix Id */
+            stix_id: string;
         };
         /** PortfolioTechnologyCreate */
         PortfolioTechnologyCreate: {
@@ -518,6 +762,13 @@ export interface components {
             /** Reviewed At */
             reviewed_at: string | null;
         };
+        /** SkippedMitigationItem */
+        SkippedMitigationItem: {
+            /** M Id */
+            m_id: string;
+            /** Mitigation Name */
+            mitigation_name: string;
+        };
         /** TechniqueCatalogResult */
         TechniqueCatalogResult: {
             /** Techniques */
@@ -537,7 +788,7 @@ export interface components {
              * Mapping Source
              * @enum {string}
              */
-            mapping_source: "specific" | "tactic_default";
+            mapping_source: "specific" | "tactic_default" | "mitre_derived";
             /** Resolved Via Technique Id */
             resolved_via_technique_id: string | null;
             /**
@@ -572,7 +823,27 @@ export interface components {
              * Mapping Source
              * @enum {string}
              */
-            mapping_source: "specific" | "tactic_default";
+            mapping_source: "specific" | "tactic_default" | "mitre_derived";
+            /** Deprecated */
+            deprecated: boolean;
+        };
+        /** UnmappedTacticPhaseItem */
+        UnmappedTacticPhaseItem: {
+            /** Technique Id */
+            technique_id: string;
+            /** Name */
+            name: string;
+            /** Phase Names */
+            phase_names: string[];
+        };
+        /** UpdatedTechniqueDiffItem */
+        UpdatedTechniqueDiffItem: {
+            /** Technique Id */
+            technique_id: string;
+            /** Changes */
+            changes: {
+                [key: string]: components["schemas"]["FieldChange"];
+            };
         };
         /** ValidationError */
         ValidationError: {
@@ -776,6 +1047,7 @@ export interface operations {
                 tactic?: string | null;
                 status?: string | null;
                 q?: string | null;
+                include_deprecated?: boolean;
             };
             header?: never;
             path?: never;
@@ -1119,6 +1391,190 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesBriefingRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_fetch_api_admin_mitre_import_fetch_post: {
+        parameters: {
+            query?: {
+                triggered_by?: string | null;
+                ref?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportBatchRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_upload_api_admin_mitre_import_upload_post: {
+        parameters: {
+            query?: {
+                triggered_by?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_post_upload_api_admin_mitre_import_upload_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportBatchRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_batches_api_admin_mitre_import_batches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportBatchRead"][];
+                };
+            };
+        };
+    };
+    get_batch_api_admin_mitre_import_batches__batch_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportBatchRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_apply_batch_api_admin_mitre_import_batches__batch_id__apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplySelection"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportBatchRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_rollback_batch_api_admin_mitre_import_batches__batch_id__rollback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportBatchRead"];
                 };
             };
             /** @description Validation Error */

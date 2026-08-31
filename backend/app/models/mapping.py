@@ -9,6 +9,12 @@ from app.core.db import Base
 class MappingSource(str, enum.Enum):
     SPECIFIC = "specific"
     TACTIC_DEFAULT = "tactic_default"
+    # Automatisch aus einer MITRE-Mitigation (M-Nummer) abgeleitet, Abschnitt
+    # 6a.3/10e. Die UniqueConstraint auf technique_id lässt pro Technik nur
+    # eine Zeile zu — ein Import darf eine bestehende 'specific'-Zeile
+    # deshalb nie überschreiben (Abschnitt 6a.3 Punkt 6), statt einer
+    # Laufzeit-Fallback-Kette zwischen den beiden Werten.
+    MITRE_DERIVED = "mitre_derived"
 
 
 class ImpactLevel(str, enum.Enum):

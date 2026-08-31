@@ -62,10 +62,16 @@ export function Sidebar() {
         </NavLink>
       </NavGroup>
 
+      <NavGroup label="Admin">
+        <NavLink to="/admin/mitre-import" className={navItemClass}>
+          MITRE-Import
+        </NavLink>
+      </NavGroup>
+
       <div className="mt-auto rounded-md border border-line-soft bg-graphite-850 p-3">
-        <div className="text-[12.5px] font-semibold text-ink-100">Schritt 5 · Sales-Briefing</div>
+        <div className="text-[12.5px] font-semibold text-ink-100">Schritt 6 · MITRE-Import</div>
         <div className="mt-1 text-[11.5px] leading-relaxed text-ink-400">
-          MITRE-Techniken-Import, Mitigations-Bootstrap und Auth folgen in Schritt 6+.
+          Rollenmodell/Auth-Anbindung und Reporting/Export folgen in Schritt 7+.
         </div>
       </div>
     </aside>

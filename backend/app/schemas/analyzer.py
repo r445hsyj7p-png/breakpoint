@@ -10,7 +10,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-MappingSourceLiteral = Literal["specific", "tactic_default"]
+MappingSourceLiteral = Literal["specific", "tactic_default", "mitre_derived"]
 ImpactLiteral = Literal["niedrig", "mittel", "hoch", "sehr_hoch"]
 EffortLiteral = Literal["niedrig", "mittel", "hoch"]
 ControlCategoryLiteral = Literal["prevent", "detect", "respond"]

@@ -13,10 +13,13 @@ def get_techniques(
     tactic: str | None = None,
     status: str | None = None,
     q: str | None = None,
+    include_deprecated: bool = False,
     db: Session = Depends(get_db),
 ) -> TechniqueCatalogResult:
     """Techniken-Katalog mit Mapping-Status je Technik, für den 'Alle
     Techniken'-Tab (docs/projektauftrag.md Abschnitt 10b.1). `tactic` filtert
-    nach Taktik-Name, `status` nach 'specific'/'tactic_default', `q` durchsucht
-    Technik-ID und -Name (case-insensitive)."""
-    return list_techniques(db, tactic_name=tactic, status=status, q=q)
+    nach Taktik-Name, `status` nach 'specific'/'tactic_default'/'mitre_derived',
+    `q` durchsucht Technik-ID und -Name (case-insensitive). Von MITRE als
+    deprecated markierte Techniken (Abschnitt 10e) sind standardmäßig
+    ausgeblendet, `include_deprecated=true` zeigt sie zusätzlich an."""
+    return list_techniques(db, tactic_name=tactic, status=status, q=q, include_deprecated=include_deprecated)

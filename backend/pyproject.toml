@@ -12,12 +12,14 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.5",
     "pydantic-ai>=2.36",
+    # Für den MITRE-STIX-Bundle-Fetch (Abschnitt 10e.2) — vorher nur
+    # transitiv über TestClient vorhanden, jetzt echte Laufzeit-Abhängigkeit.
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3",
-    "httpx>=0.27",
     "ruff>=0.7",
 ]
 

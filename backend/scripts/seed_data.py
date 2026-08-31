@@ -473,3 +473,69 @@ ALL_CAPABILITIES: list[str] = [
     "Asset Visibility", "Attack Surface Management", "Threat Intelligence",
     "Data Loss Prevention", "Network Detection & Response",
 ]
+
+# Kuratierter Mitigation->Capability/Control-Crosswalk für den MITRE-
+# Mitigations-Bootstrap (docs/projektauftrag.md Abschnitt 6a.3/10e.2). Kein
+# Admin-UI, lebt als Code-Liste (analog ALL_CAPABILITIES) und wird von einem
+# Entwickler erweitert, wenn ein Import neue M-Nummern zeigt (Abschnitt 6a.3
+# Punkt 7). Gegen die aktuelle MITRE-ATT&CK-Mitigations-Liste (44 aktuelle,
+# nicht-deprecated M-Nummern, Stand dieser Session) geprüft — bewusst nicht
+# vollständig: nicht jede Mitigation bildet sauber auf eine bestehende
+# Capability ab (Abschnitt 6a.3 Punkt 3, z. B. reine Policy-/Prozess-
+# Empfehlungen wie M1013 "Application Developer Guidance" oder MITRE-interne
+# Platzhalter wie M1055 "Do Not Mitigate"/M1056 "Pre-compromise" bleiben
+# absichtlich ungemappt).
+#
+# control_label ist absichtlich Deutsch und, wo sinnvoll, identisch mit einem
+# bereits im Prototyp-KB verwendeten Control-Label (z. B. "MFA erzwingen",
+# "PAM", "Application Control", "Credential Guard", "Microsegmentation",
+# "Exploit Protection", "Patch Management", "Immutable Backups",
+# "Conditional Access") — der Import erstellt dadurch keinen doppelten,
+# englisch benannten Control-Zwilling, sondern hängt sich an dieselbe, von
+# Menschen kuratierte Maßnahme an. Das verbessert die Kettenabdeckung direkt
+# (mehr Techniken teilen sich denselben Control-Eintrag), statt nur den
+# Katalog mit englischsprachigen Duplikaten aufzublähen.
+# Wert je M-Nummer: {"control_label": str, "capabilities": list[str]}
+MITIGATION_CROSSWALK: dict[str, dict] = {
+    "M1015": {"control_label": "AD-Härtung", "capabilities": ["Identity Governance"]},
+    "M1016": {"control_label": "Schwachstellen-Scanning", "capabilities": ["Attack Surface Management"]},
+    "M1017": {"control_label": "Security-Awareness-Training", "capabilities": ["Security Awareness"]},
+    "M1018": {"control_label": "Kontenverwaltung", "capabilities": ["Identity Governance"]},
+    "M1019": {"control_label": "Threat-Intelligence-Programm", "capabilities": ["Threat Intelligence"]},
+    "M1025": {"control_label": "LSASS-Schutz", "capabilities": ["Credential Guard"]},
+    "M1026": {"control_label": "PAM", "capabilities": ["PAM"]},
+    "M1027": {"control_label": "Passwort-Richtlinien", "capabilities": ["Identity Governance"]},
+    "M1029": {"control_label": "Immutable Backups", "capabilities": ["Backup & Recovery"]},
+    "M1030": {"control_label": "Microsegmentation", "capabilities": ["Network Segmentation"]},
+    "M1031": {"control_label": "Netzwerk-Intrusion-Prevention", "capabilities": ["Network Detection & Response"]},
+    "M1032": {"control_label": "MFA erzwingen", "capabilities": ["MFA"]},
+    "M1033": {"control_label": "Application Control", "capabilities": ["Application Control"]},
+    "M1035": {"control_label": "Microsegmentation", "capabilities": ["Network Segmentation"]},
+    "M1036": {"control_label": "Conditional Access", "capabilities": ["Conditional Access"]},
+    "M1037": {"control_label": "Endpoint-Firewall-Regeln", "capabilities": ["Endpoint Firewall"]},
+    "M1038": {"control_label": "Application Control", "capabilities": ["Application Control"]},
+    "M1040": {"control_label": "Verhaltensbasierte Endpoint-Prävention (EDR)", "capabilities": ["EDR"]},
+    "M1041": {"control_label": "Verschlüsselung sensibler Daten", "capabilities": ["Data Loss Prevention"]},
+    "M1042": {"control_label": "Angriffsfläche reduzieren", "capabilities": ["Attack Surface Management"]},
+    "M1043": {"control_label": "Credential Guard", "capabilities": ["Credential Guard"]},
+    "M1044": {"control_label": "Application Control", "capabilities": ["Application Control"]},
+    "M1045": {"control_label": "Code-Signing-Pflicht", "capabilities": ["Application Control"]},
+    "M1048": {"control_label": "Application Isolation / Sandboxing", "capabilities": ["EDR"]},
+    "M1049": {"control_label": "Antivirus / Antimalware", "capabilities": ["EDR"]},
+    "M1050": {"control_label": "Exploit Protection", "capabilities": ["EDR"]},
+    "M1051": {"control_label": "Patch Management", "capabilities": ["Attack Surface Management"]},
+    "M1052": {"control_label": "PAM", "capabilities": ["PAM"]},
+    "M1053": {"control_label": "Immutable Backups", "capabilities": ["Backup & Recovery"]},
+    "M1057": {"control_label": "DLP-Kontrollen", "capabilities": ["Data Loss Prevention"]},
+    # M1020 SSL/TLS Inspection, M1021 Restrict Web-Based Content,
+    # M1022 Restrict File and Directory Permissions,
+    # M1024 Restrict Registry Permissions, M1034 Limit Hardware Installation,
+    # M1039 Environment Variable Permissions, M1046 Boot Integrity,
+    # M1047 Audit, M1060 Out-of-Band Communications Channel: bewusst nicht
+    # gemappt — keine bestehende Capability bildet das sauber ab.
+    # M1013 Application Developer Guidance, M1028 Operating System
+    # Configuration, M1054 Software Configuration: reine Prozess-/Policy-
+    # Empfehlungen ohne Technologie-Bezug (Abschnitt 6a.3 Punkt 3).
+    # M1055 Do Not Mitigate, M1056 Pre-compromise: MITRE-Platzhalterwerte,
+    # keine echten Mitigations.
+}
