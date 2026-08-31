@@ -1,6 +1,6 @@
 # Projektauftrag für Claude Code: Breakpoint — ATT&CK-to-Action Plattform
 
-> **v5 — ergänzt bei Schritt-4-Planung vom 29.08.2026.** Neuer Abschnitt 10c konkretisiert Schritt 4 (Portfolio-Modul): Datenmodell, Coverage/Gap-Berechnung, Self-Service-CRUD, und die Aktivierung des bisher immer leeren `portfolio_fit`-Felds im kanonischen Analyzer-Schema. Frühere Änderungen: ▶ **Update v4** — Abschnitt 10b konkretisiert Schritt 3 (Frontend-Anbindung). ▶ **Update v3** — gezielte, enge Ausnahme von der Offline-Regel für den MITRE-Import (Abschnitt 2, 6a.2, 9). ▶ **Update v2** — aus der Review-Session vom 29.08.2026: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe Abschnitt 2a).
+> **v6 — ergänzt am 29.08.2026.** Neuer Abschnitt 6a.3 plant die Nutzung offizieller MITRE-Mitigations (M-Nummern) als Bootstrap für spezifische Mappings (Teil von Schritt 6, kritisch hinterfragt: nur Prevent, kein Impact/Effort von MITRE, nicht jede Mitigation bildet sauber auf eine Capability ab, dritter `mapping_source`-Wert nötig). Dabei ein konkreter Code-Fund: `resolve_technique()` schreibt `mapping_source` aktuell als hartkodierten String statt den Wert aus der DB zu lesen — muss vor Schritt 6 behoben werden, sonst würden künftige `mitre_derived`-Zeilen fälschlich als `specific` ausgegeben. Frühere Änderungen: ▶ **Update v5** — Abschnitt 10c konkretisiert Schritt 4 (Portfolio-Modul). ▶ **Update v4** — Abschnitt 10b konkretisiert Schritt 3 (Frontend-Anbindung). ▶ **Update v3** — gezielte, enge Ausnahme von der Offline-Regel für den MITRE-Import (Abschnitt 2, 6a.2, 9). ▶ **Update v2** — aus der Review-Session vom 29.08.2026: kritische Prüfung des Auftrags + Code-Review des interaktiven HTML-Prototyps (`breakpoint-dashboard.html`) + eine vom Auftraggeber formulierte Zielbild-Zusammenfassung (siehe Abschnitt 2a).
 
 Dieses Dokument ist der vollständige Übergabe-Auftrag, um das bisher als HTML-Mockup validierte Konzept **Breakpoint** ("From Attack Technique to Action") als produktive, im eigenen Datacenter betriebene Anwendung mit Claude Code umzusetzen. Es enthält Kontext, Architekturentscheidungen, Datenmodell, Modulübersicht und einen konkret ausführbaren **Schritt 1**.
 
@@ -136,7 +136,7 @@ control
 
 technique_capability_mapping
   id (PK), technique_id (FK),
-  mapping_source ENUM('specific','tactic_default'),
+  mapping_source ENUM('specific','mitre_derived','tactic_default'),  -- ▶ (v6)
   impact ENUM('niedrig','mittel','hoch','sehr_hoch'),
   effort ENUM('niedrig','mittel','hoch')
 
@@ -225,6 +225,24 @@ Beide Funktionen sind **kein "nice to have"**, sondern Grundvoraussetzung, damit
 5. **Kein Zwang zur Vollständigkeit**: Der bestehende Taktik-Standardmapping-Mechanismus (Abschnitt 5) fängt neu importierte, noch nicht spezifisch gemappte Techniken automatisch ab — ein Import macht das Tool also nie "kaputt", auch wenn niemand sofort neue Capability-Zuordnungen für frisch importierte Techniken pflegt.
 
 Zugriff ebenfalls nur für `admin`. Diese Funktion sollte **nicht** mit der Portfolio-Verwaltung (6a.1) verwechselt oder in derselben Ansicht vermischt werden — beide sind eigene Unterseiten im Admin-Bereich.
+
+### 6a.3 MITRE-Mitigations als Bootstrap für spezifische Mappings *(neu, v6)*
+
+**Idee:** MITRE-Mitigations (M-Nummern, STIX-Objekt `course-of-action`) sind bereits im selben STIX-Bundle enthalten, das der Import in 6a.2 ohnehin zieht, und über `mitigates`-Relationships zahlreichen Techniken zugeordnet — kein zusätzlicher Datenimport nötig. Das kann die Anzahl der Techniken mit technique-spezifischem statt nur taktik-grobem Mapping potenziell von 10 (Schritt 1) auf einen Großteil des Katalogs heben, ohne jede Technik einzeln von Hand zu kuratieren.
+
+**Warum sich der Zusatzaufwand lohnt, trotz der Einschränkungen unten:** Kettenabdeckung (Abschnitt 2a/10a.4) ist umso aussagekräftiger, je spezifischer die Controls sind — 14 taktik-grobe Control-Sets, die sich Dutzende Techniken teilen, verwässern das Signal "wie viele beobachtete Techniken bricht diese Maßnahme wirklich". Technique-spezifische Prevent-Controls verbessern das Herzstück der Übersetzungskette direkt, nicht nur die Katalog-Optik.
+
+**Kritische Einschränkungen (bewusst vor der Umsetzung geklärt, nicht erst beim Bauen entdeckt):**
+
+1. **Nur Prevent, nicht Detect/Respond.** MITRE liefert für Mitigations keine strukturierte Detect-/Respond-Taxonomie — nur ein Freitext-"Detection"-Feld je Technik, keine eigene ID-Struktur wie bei Mitigations. Detect/Respond bleiben Handarbeit; dieser Bootstrap verbessert ausschließlich die Prevent-Spalte. MITRE D3FEND bietet zwar eine offizielle Mapping-Tabelle ATT&CK-Mitigations→D3FEND-Techniken, das ist aber ein eigenes Framework mit eigener Komplexität — bewusst **nicht** jetzt einbeziehen (Scope-Disziplin, vgl. "kein Navigator-Klon"-Prinzip aus Abschnitt 2a), höchstens ein separat zu bewertender späterer Ausbau.
+2. **Kein Impact/Effort von MITRE.** `technique_capability_mapping.impact`/`.effort` sind NOT NULL; MITRE liefert dafür keine Werte — das ist Breakpoints eigene Geschäftseinschätzung. Automatisch importierte Mitigation-Mappings übernehmen deshalb **impact/effort vom `tactic_default_mapping` derselben Taktik** als Startwert (transparente Näherung, kein Blocker für die Automatisierung) — ein Admin kann das später technikweise verfeinern.
+3. **Nicht jede Mitigation bildet sauber auf eine Capability ab.** Manche M-Nummern sind konkret und technologienah (M1032 Multi-Factor Authentication → Capability "MFA"), andere sind Prozess-/Policy-Empfehlungen ohne Technologie-Bezug (z. B. "Application Developer Guidance", "User Training" grenzwertig zu "Security Awareness"). Realistisch mit Fällen rechnen, die auf gar keine bestehende Capability abgebildet werden — dann bleibt diese eine Mitigation für den Bootstrap ungenutzt, das ist kein Fehler, nur unvollständige Abdeckung.
+4. **`mapping_source` bekommt einen dritten Wert — echte Migration, kein Zero-Cost-Change.** Ein automatisch aus MITRE übernommenes Mapping ist weder handkuratiert (`specific`) noch nur taktik-grob (`tactic_default`). Neuer Wert `mitre_derived`, neue Präzedenz in der Fallback-Kette (Abschnitt 10a.3): `specific` (Mensch) > `mitre_derived` (MITRE, automatisch, nur Prevent) > `tactic_default`. Das ist genau der Fall, vor dem die frühere Warnung zu nativen Postgres-ENUMs (schwerer per Alembic erweiterbar) real wird — technisch machbar (`ALTER TYPE … ADD VALUE` außerhalb einer Transaktion, von Alembic unterstützt), aber einzuplanen, nicht "nebenbei".
+5. ▶ **Konkreter Code-Fund beim Review dieses Plans:** `resolve_technique()` (`backend/app/services/analyzer.py`, aktuell Zeilen 62 und 91) schreibt `mapping_source` als **hartkodierten String** (`"specific"` bzw. `"tactic_default"`) in `TechniqueResult`, statt den tatsächlichen Wert aus der `TechniqueCapabilityMapping`-Zeile zu lesen. Solange nur diese zwei Werte existieren, ist das unsichtbar richtig — sobald `mitre_derived`-Zeilen in derselben Tabelle landen, würde dieser Code sie stillschweigend als `"specific"` ausgeben. **Muss vor Schritt 6 auf `mapping.mapping_source.value` umgestellt werden**, sonst bricht die Transparenz-Garantie aus Abschnitt 2a ("woher kommt diese Empfehlung") genau an der Stelle, die sie eigentlich schützen soll.
+6. **Geht durch denselben Review-Gate wie jeder Import, kein Sonderfall.** Mitigation-Mappings erscheinen in der Diff-Ansicht (6a.2, Punkt 2) wie neue/geänderte Techniken; ein Admin bestätigt vor Übernahme. Überschreibt **nie** eine bestehende `specific`-Zeile (gleiche Regel wie 6a.2, Punkt 3). Die Sub-Technique-Fallback-Logik (`parent_technique_id`-Traversal) gilt für `mitre_derived` genauso wie für `specific` — keine neue Logik, nur ein weiterer möglicher `mapping_source`-Wert an derselben Stelle.
+7. **Der Mitigation→Capability-Crosswalk ist kuratierte Seed-Daten, keine neue Admin-UI-Fläche.** Konsistent damit, dass auch `capability` selbst nicht über eine Admin-Oberfläche gepflegt wird (nur Portfolio-Technologie↔Capability ist Self-Service, Abschnitt 6a.1) — der Crosswalk lebt als Liste im Code (analog `ALL_CAPABILITIES` in `seed_data.py`), von einem Entwickler erweitert, wenn ein Import neue M-Nummern zeigt.
+
+**Aufwand-Realitätscheck:** Kein Nebenbei-Task innerhalb des ohnehin geplanten Schritt 6 — der STIX-Parser muss zusätzlich `course-of-action`-Objekte und `mitigates`-Relationships auswerten, die Diff-Ansicht um eine dritte Kategorie erweitern, und Enum/Fallback-Kette ändern sich. Als eigener, benannter Teilschritt innerhalb Schritt 6 einplanen (Konkretisierung folgt, sobald Schritt 6 selbst dran ist), nicht implizit "auf dem Weg mitnehmen".
 
 ---
 
@@ -431,6 +449,8 @@ Implementiert die in Abschnitt 5 **korrigierte** Fallback-Kette (nicht die Proto
 3. Sonst: `tactic_default_mapping` der Taktik der Technik → `mapping_source="tactic_default"`, `resolved_via_technique_id=None`.
 4. Sonst (Technik-Code auch nicht im Katalog): landet in `unknown_codes`.
 
+▶ *(v6, Vormerkung für Schritt 6)* Wird um eine vierte Stufe zwischen 1./2. und 3. erweitert (`mitre_derived`, s. Abschnitt 6a.3) — dabei muss `mapping_source` dynamisch aus der DB gelesen werden, aktuell steht an dieser Stelle noch der hartkodierte String `"specific"` (Abschnitt 6a.3, Punkt 5).
+
 ### 10a.4 Prioritätsalgorithmus (v1, bewusst einfach)
 
 Löst die in Abschnitt 12 (Frage 9) offene Gewichtungsfrage für Schritt 2 pragmatisch: Aggregation pro **eindeutigem Control** über alle analysierten Techniken hinweg (via die Join-Tabellen), dann Sortierung nach:
@@ -606,7 +626,7 @@ Fehlende Fehleranzeige bei fehlgeschlagenem Bearbeiten/Deaktivieren im Frontend 
 - **Schritt 3:** ✅ siehe Abschnitt 10b (konkretisiert)
 - **Schritt 4:** ✅ siehe Abschnitt 10c (konkretisiert)
 - **Schritt 5:** PydanticAI-Sales-Briefing-Modul gegen interne LLM-Plattform (siehe Abschnitt 7), inkl. Post-Processing-Guard und asynchroner Verarbeitung
-- **Schritt 6:** **Admin-Bereich MITRE-Techniken-Import** mit Upload, Diff-Ansicht, Versionierung/Rollback (Abschnitt 6a.2), STIX-Relationship-basierte Sub-Technique-Zuordnung
+- **Schritt 6:** **Admin-Bereich MITRE-Techniken-Import** mit Upload, Diff-Ansicht, Versionierung/Rollback (Abschnitt 6a.2), STIX-Relationship-basierte Sub-Technique-Zuordnung, **plus MITRE-Mitigations-Bootstrap** (Abschnitt 6a.3, eigener Teilschritt, kritisch vorab geklärte Einschränkungen)
 - **Schritt 7:** Reporting/Export, Rollenmodell/Auth-Anbindung, Audit-Log-UI
 
 ---
