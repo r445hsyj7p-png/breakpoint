@@ -21,4 +21,12 @@ echo "Seede Grunddaten (idempotent)..."
 python -m scripts.seed
 
 echo "Starte Backend..."
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# --reload beobachtet Quelldateien und ist nur für die lokale Entwicklung
+# (bind-gemountete Quellen, infra/docker-compose.yml) sinnvoll; in Produktion
+# (infra/docker-compose.prod.yml) unnötiger Overhead ohne Nutzen, da dort
+# nichts gemountet wird und sich die Quellen im Image nie ändern.
+if [ "${UVICORN_RELOAD:-true}" = "true" ]; then
+  exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+else
+  exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+fi

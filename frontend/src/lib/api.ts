@@ -17,6 +17,10 @@ export type SalesBriefingRead = components['schemas']['SalesBriefingRead']
 export type ImportBatchRead = components['schemas']['ImportBatchRead']
 export type ImportDiff = components['schemas']['ImportDiff']
 
+// Produktions-Build (frontend/.env.production) setzt das explizit auf "" —
+// dann bleiben die Requests relativ und werden vom Produktions-nginx
+// (nginx.conf) zum Backend proxied. Nur bei fehlender Env-Variable (lokale
+// Entwicklung, "npm run dev") greift der 127.0.0.1-Default.
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 
 export class ApiError extends Error {

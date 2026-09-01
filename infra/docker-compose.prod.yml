@@ -1,0 +1,61 @@
+name: breakpoint
+
+# Produktions-Deploy für einen VPS (docs/projektauftrag.md Abschnitt 10h).
+#
+# ACHTUNG — bewusste, dokumentierte POC-Ausnahme von der "nicht verhandelbar"-
+# Guardrail aus Abschnitt 8: die App hat noch KEINEN Auth-Layer (OIDC kommt
+# erst in Schritt 7). Dieses Compose-File macht den Frontend/nginx-Service
+# öffentlich auf Port 80 erreichbar, ohne jeden Zugriffsschutz — explizit nur
+# für einen Proof-of-Concept mit nicht-sensiblen Testdaten freigegeben, nicht
+# für echte Kundendaten. Vor produktivem Einsatz mit echten Daten: OIDC-Layer
+# umsetzen und/oder VPN/IP-Allowlist/Basic-Auth vorschalten.
+#
+# Start: docker compose -f infra/docker-compose.prod.yml up --build -d
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-breakpoint}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-breakpoint}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    # Kein Host-Port-Publish — nur im internen Docker-Netzwerk erreichbar,
+    # auch auf dem VPS niemals direkt von außen ansprechbar.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-breakpoint}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://breakpoint:change-me@db:5432/breakpoint}
+      UVICORN_RELOAD: "false"
+    # Ebenfalls kein Host-Port-Publish — nur über das interne Netzwerk vom
+    # nginx-Service (frontend) erreichbar, s. frontend/nginx.conf.
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      target: production
+    restart: unless-stopped
+    ports:
+      # Einziger öffentlich erreichbarer Port — nginx liefert die gebauten
+      # Assets aus und proxied /api/ intern an den backend-Service.
+      - "${PUBLIC_HTTP_PORT:-80}:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

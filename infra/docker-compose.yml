@@ -42,6 +42,7 @@ services:
   frontend:
     build:
       context: ../frontend
+      target: dev
     restart: unless-stopped
     volumes:
       - ../frontend/src:/app/src
